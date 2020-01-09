@@ -38,15 +38,31 @@ printnum(void (*putch)(int, void*), void *putdat,
 {
 	// first recursively print all preceding (more significant) digits
 	if (num >= base) {
-		printnum(putch, putdat, num / base, base, width - 1, padc);
+		if (padc == '-') {
+			// only the least significant digit need '-', 
+			// pass magic padc '@' to more significant digits
+			printnum(putch, putdat, num / base, base, width - 1, '@');
+		} else {
+			printnum(putch, putdat, num / base, base, width - 1, padc);
+		}
 	} else {
 		// print any needed pad characters before first digit
-		while (--width > 0)
-			putch(padc, putdat);
+		if (padc != '@') 
+			while (--width > 0)
+				putch(padc, putdat);
 	}
 
 	// then print this (the least significant) digit
 	putch("0123456789abcdef"[num % base], putdat);
+	int usedWidth = 0;
+	while (num >= base) {
+		usedWidth += 1;
+		num = num / base;
+	}
+	if (padc == '-') {
+		while (++usedWidth < width)
+			putch(' ', putdat);
+	}
 }
 
 // Get an unsigned int of various possible sizes from a varargs list,

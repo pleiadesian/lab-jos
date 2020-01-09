@@ -7,7 +7,7 @@
 #include <kern/monitor.h>
 #include <kern/console.h>
 
-// my testcase
+// my testcases
 void
 test_printn()
 {
@@ -15,6 +15,14 @@ test_printn()
     cprintf("%+d%n%x%n", 1, &num, 10, &num1);
     cprintf("\n%d %d\n", (int)num, (int)num1);
 }
+
+void
+test_printminus()
+{
+	char str[5] = {'a', 'b', 'c', 'd', 'e'};
+	cprintf("%-10s, %-10dend\n", str, 12345);
+}
+
 
 // Test the stack backtrace function (lab 1 only)
 void
@@ -43,7 +51,7 @@ i386_init(void)
 	cons_init();
 
 	// my testcase
-	test_printn();
+	test_printminus();
 
 	cprintf("6828 decimal is %o octal!\n", 6828);
 
