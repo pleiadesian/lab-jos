@@ -109,6 +109,11 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 			padc = '-';
 			goto reswitch;
 
+		// flag to precede the result with a plus or minus sign
+		case '+':
+			padc = '+';
+			goto reswitch;
+
 		// flag to pad with 0's instead of spaces
 		case '0':
 			padc = '0';
@@ -193,6 +198,8 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 			if ((long long) num < 0) {
 				putch('-', putdat);
 				num = -(long long) num;
+			} else if (padc == '+') {
+				putch('+', putdat);
 			}
 			base = 10;
 			goto number;
