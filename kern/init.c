@@ -7,6 +7,15 @@
 #include <kern/monitor.h>
 #include <kern/console.h>
 
+// my testcase
+void
+test_printn()
+{
+    char num, num1;
+    cprintf("%+d%n%x%n", 1, &num, 10, &num1);
+    cprintf("\n%d %d\n", (int)num, (int)num1);
+}
+
 // Test the stack backtrace function (lab 1 only)
 void
 test_backtrace(int x)
@@ -32,6 +41,9 @@ i386_init(void)
 	// Initialize the console.
 	// Can't call cprintf until after we do this!
 	cons_init();
+
+	// my testcase
+	test_printn();
 
 	cprintf("6828 decimal is %o octal!\n", 6828);
 

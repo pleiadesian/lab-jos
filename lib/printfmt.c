@@ -85,8 +85,9 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 	register const char *p;
 	register int ch, err;
 	unsigned long long num;
-	int base, lflag, width, precision, altflag;
+	int base, lflag, width, precision, altflag, cnt;
 	char padc;
+	char *dst;
 
 	while (1) {
 		while ((ch = *(unsigned char *) fmt++) != '%') {
@@ -159,6 +160,19 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 		case 'l':
 			lflag++;
 			goto reswitch;
+
+		// the number of characters written so far
+		case 'n':
+			dst = va_arg(ap, char *);
+			cnt = *(int *)putdat;
+			// recount from zero if char overflow
+			if (cnt > 127)
+				cnt = cnt % 128;
+			// malloc a char space if argument is null pointer
+			if (dst == NULL)
+				memset(dst, 0, sizeof(char));
+			*dst = (char)cnt;
+			break;
 
 		// character
 		case 'c':
