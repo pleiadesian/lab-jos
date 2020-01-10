@@ -182,19 +182,6 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 			lflag++;
 			goto reswitch;
 
-		// the number of characters written so far
-		case 'n':
-			dst = va_arg(ap, char *);
-			cnt = *(int *)putdat;
-			// recount from zero if char overflow
-			if (cnt > 127)
-				cnt = cnt % 128;
-			// malloc a char space if argument is null pointer
-			if (dst == NULL)
-				memset(dst, 0, sizeof(char));
-			*dst = (char)cnt;
-			break;
-
 		// character
 		case 'c':
 			putch(va_arg(ap, int), putdat);
@@ -270,30 +257,43 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 			printnum(putch, putdat, num, base, width, padc);
 			break;
 
-		// case 'n': {
-		// 		  // You can consult the %n specifier specification of the C99 printf function
-		// 		  // for your reference by typing "man 3 printf" on the console. 
+		case 'n': {
+			// You can consult the %n specifier specification of the C99 printf function
+			// for your reference by typing "man 3 printf" on the console. 
 
-		// 		  // 
-		// 		  // Requirements:
-		// 		  // Nothing printed. The argument must be a pointer to a signed char, 
-		// 		  // where the number of characters written so far is stored.
-		// 		  //
+			// 
+			// Requirements:
+			// Nothing printed. The argument must be a pointer to a signed char, 
+			// where the number of characters written so far is stored.
+			//
 
-		// 		  // hint:  use the following strings to display the error messages 
-		// 		  //        when the cprintf function ecounters the specific cases,
-		// 		  //        for example, when the argument pointer is NULL
-		// 		  //        or when the number of characters written so far 
-		// 		  //        is beyond the range of the integers the signed char type 
-		// 		  //        can represent.
+			// hint:  use the following strings to display the error messages 
+			//        when the cprintf function ecounters the specific cases,
+			//        for example, when the argument pointer is NULL
+			//        or when the number of characters written so far 
+			//        is beyond the range of the integers the signed char type 
+			//        can represent.
 
-		// 		  const char *null_error = "\nerror! writing through NULL pointer! (%n argument)\n";
-		// 		  const char *overflow_error = "\nwarning! The value %n argument pointed to has been overflowed!\n";
+			const char *null_error = "\nerror! writing through NULL pointer! (%n argument)\n";
+			const char *overflow_error = "\nwarning! The value %n argument pointed to has been overflowed!\n";
 
-		// 		  // Your code here
+			// Your code here
+			dst = va_arg(ap, char *);
+			cnt = *(int *)putdat;
+			// recount from zero if char overflow
+			if (cnt > 127) {
+				printfmt(putch, putdat, "%s", overflow_error);
+				cnt = cnt % 128;
+			}
+			// malloc a char space if argument is null pointer
+			if (dst == NULL) {
+				printfmt(putch, putdat, "%s", null_error);
+				break;
+			}
+			*dst = (char)cnt;
 
-		// 		  break;
-		// 	  }
+			break;
+		}
 
 		// escaped '%' character
 		case '%':
