@@ -25,6 +25,7 @@ static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "readebp", "Display the value of ebp", mon_readebp},
+	{ "time", "Counts the program's running time", mon_time},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -86,7 +87,7 @@ start_overflow(void)
     char str[256] = {};
     int nstr = 0;
     char *pret_addr;
-	int ovfl_byte[8] = { 0x5c, 0x9, 0x10, 0xf0, 0x82, 0xb, 0x10, 0xf0};
+	int ovfl_byte[8] = { 0x3b, 0xa, 0x10, 0xf0, 0x61, 0xc, 0x10, 0xf0};
 
 	// Your code here.
 	// use %n overwrite return address
@@ -152,6 +153,27 @@ mon_readebp(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
+int
+mon_time(int argc, char **argv, struct Trapframe *tf)
+{
+	if (argc < 2) {
+		cprintf("The usage is: time [command]\n");
+		return 0;
+	}
+
+	for (int i = 0; i < ARRAY_SIZE(commands); i++) {
+		if (strcmp(argv[1], commands[i].name) == 0) {
+			uint64_t tsc_start = read_tsc();
+			int ret = commands[i].func(argc - 1, ++argv, tf);
+			uint64_t tsc_end = read_tsc();
+			cprintf("kerninfo cycles: %llu\n", tsc_end - tsc_start);
+			return ret;
+		}
+	}
+
+	cprintf("Unknown command '%s'\n", argv[1]);
+	return 0;
+}
 
 
 /***** Kernel monitor command interpreter *****/
