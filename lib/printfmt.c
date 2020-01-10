@@ -283,7 +283,6 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 			// recount from zero if char overflow
 			if (cnt > 127) {
 				printfmt(putch, putdat, "%s", overflow_error);
-				cnt = cnt % 128;
 			}
 			// malloc a char space if argument is null pointer
 			if (dst == NULL) {

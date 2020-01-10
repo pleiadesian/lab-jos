@@ -7,23 +7,6 @@
 #include <kern/monitor.h>
 #include <kern/console.h>
 
-// my testcases
-void
-test_printn()
-{
-    char num, num1;
-    cprintf("%+d%n%x%n", 1, &num, 10, &num1);
-    cprintf("\n%d %d\n", (int)num, (int)num1);
-}
-
-void
-test_printminus()
-{
-	char str[5] = {'a', 'b', 'c', 'd', 'e'};
-	cprintf("%-10s, %-10dend\n", str, 12345);
-}
-
-
 // Test the stack backtrace function (lab 1 only)
 void
 test_backtrace(int x)
@@ -53,13 +36,13 @@ i386_init(void)
 	cons_init();
 
 	cprintf("6828 decimal is %o octal!%n\n%n", 6828, &chnum1, &chnum2);
-	// cprintf("pading space in the right to number 22: %-8d.\n", 22);
-	// cprintf("chnum1: %d chnum2: %d\n", chnum1, chnum2);
-	// cprintf("%n", NULL);
-	// memset(ntest, 0xd, sizeof(ntest) - 1);
-	// cprintf("%s%n", ntest, &chnum1); 
-	// cprintf("chnum1: %d\n", chnum1);
-	// cprintf("show me the sign: %+d, %+d\n", 1024, -1024);
+	cprintf("pading space in the right to number 22: %-8d.\n", 22);
+	cprintf("chnum1: %d chnum2: %d\n", chnum1, chnum2);
+	cprintf("%n", NULL);
+	memset(ntest, 0xd, sizeof(ntest) - 1);
+	cprintf("%s%n", ntest, &chnum1); 
+	cprintf("chnum1: %d\n", chnum1);
+	cprintf("show me the sign: %+d, %+d\n", 1024, -1024);
 
 	// Test the stack backtrace function (lab 1 only)
 	test_backtrace(5);
