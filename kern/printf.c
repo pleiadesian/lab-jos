@@ -10,8 +10,6 @@ static void
 putch(int ch, int *cnt)
 {
 	cputchar(ch);
-	// *cnt++;  
-	// there is a bug in jos, cnt should be incremented in following way
 	(*cnt)++;
 }
 
