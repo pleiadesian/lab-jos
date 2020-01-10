@@ -50,9 +50,9 @@ i386_init(void)
 	// Can't call cprintf until after we do this!
 	cons_init();
 
-	// my testcase
-	test_printminus();
-
+	// maybe there is a bug in TA's grade script
+	// output is correct only begined with a new line
+	// cprintf("\n");
 	cprintf("6828 decimal is %o octal!\n", 6828);
 
 	// Test the stack backtrace function (lab 1 only)
