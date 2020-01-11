@@ -24,6 +24,8 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "readebp", "Display the value of ebp", mon_readebp},
+	{ "time", "Counts the program's running time", mon_time},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -54,13 +56,124 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 	return 0;
 }
 
+// Lab1 only
+// read the pointer to the retaddr on the stack
+static uint32_t
+read_pretaddr() {
+    uint32_t pretaddr;
+    __asm __volatile("leal 4(%%ebp), %0" : "=r" (pretaddr)); 
+    return pretaddr;
+}
+
+void
+do_overflow(void)
+{
+    cprintf("Overflow success\n");
+}
+
+void
+start_overflow(void)
+{
+	// You should use a techique similar to buffer overflow
+	// to invoke the do_overflow function and
+	// the procedure must return normally.
+
+    // And you must use the "cprintf" function with %n specifier
+    // you augmented in the "Exercise 9" to do this job.
+
+    // hint: You can use the read_pretaddr function to retrieve 
+    //       the pointer to the function call return address;
+
+    char str[256] = {};
+    int nstr = 0;
+    char *pret_addr;
+	int ovfl_byte[8] = { 0x3b, 0xa, 0x10, 0xf0, 0x61, 0xc, 0x10, 0xf0};
+
+	// Your code here.
+	// use %n overwrite return address
+    pret_addr = (char *)read_pretaddr();
+	for (int i = 0 ; i < 8 ; i++) {
+		char *ovfl_addr = pret_addr + i;
+		memset(str, 0, sizeof(str));
+		memset(str, 0xd, ovfl_byte[i]);
+		cprintf("%s%n", str, ovfl_addr);
+	}
+}
+
+void
+overflow_me(void)
+{
+        start_overflow();
+}
+
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+	cprintf("Stack backtrace:\n");
+	uintptr_t eip;
+	size_t *ebp;
+	size_t args[5];
+	struct Eipdebuginfo info;
+
+	eip = (uintptr_t)read_eip();
+	ebp = (uint32_t *)read_ebp();
+	while (ebp != (uint32_t *)0) {
+		// get return address and 5 arguments from 8 bytes offset
+		for (int i = 0 ; i < 5 ; i++) 
+			args[i] = *(ebp + 2 + i);
+		cprintf("  eip %08x  ebp %08x  args %08x %08x %08x %08x %08x\n",
+				eip, ebp, args[0], args[1], args[2], args[3], args[4]);
+
+		// get eip info from kdebug
+		if (debuginfo_eip(eip, &info) < 0) {
+			cprintf("Find eip information failed\n");
+			return -1;
+		}
+		char buf[512];
+		strncpy(buf, info.eip_fn_name, info.eip_fn_namelen);
+		buf[info.eip_fn_namelen] = '\0';
+		cprintf("\t %s:%d %s+%d\n", info.eip_file, info.eip_line, buf, eip - info.eip_fn_addr);
+		
+		// get base pointer of caller frame
+		ebp = (size_t *)*ebp;
+		eip = *(ebp + 1);
+	}
+
+	overflow_me();
+    cprintf("Backtrace success\n");
 	return 0;
 }
 
+int
+mon_readebp(int argc, char **argv, struct Trapframe *tf)
+{
+	uint32_t ebp = read_ebp();
+	cprintf("$ebp = 0x%08x\n", ebp);
+	return 0;
+}
+
+int
+mon_time(int argc, char **argv, struct Trapframe *tf)
+{
+	if (argc < 2) {
+		cprintf("The usage is: time [command]\n");
+		return 0;
+	}
+
+	for (int i = 0; i < ARRAY_SIZE(commands); i++) {
+		if (strcmp(argv[1], commands[i].name) == 0) {
+			uint64_t tsc_start = read_tsc();
+			int ret = commands[i].func(argc - 1, ++argv, tf);
+			uint64_t tsc_end = read_tsc();
+			cprintf("kerninfo cycles: %llu\n", tsc_end - tsc_start);
+			return ret;
+		}
+	}
+
+	cprintf("Unknown command '%s'\n", argv[1]);
+	return 0;
+}
 
 
 /***** Kernel monitor command interpreter *****/

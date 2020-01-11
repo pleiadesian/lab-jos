@@ -223,6 +223,16 @@ read_esp(void)
 	return esp;
 }
 
+// need to get this return address to learn where backtrace starts
+// note that read eip should not be inlined
+static __attribute__ ((noinline)) uint32_t
+read_eip(void)
+{
+	uint32_t eip;
+	asm volatile ("movl 4(%%ebp),%0" : "=r"(eip));
+	return eip;
+}
+
 static inline void
 cpuid(uint32_t info, uint32_t *eaxp, uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp)
 {
