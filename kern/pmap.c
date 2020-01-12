@@ -384,7 +384,32 @@ pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 	// Fill this function in
-	return NULL;
+	pte_t *pgtab_entry = &pgdir[PDX(va)];
+
+	// check if page table is present
+	if (!(*pgtab_entry & PTE_P)) {
+		if (!create) 
+			return NULL;
+		
+		// alloc a new page table for va
+		struct PageInfo *page = page_alloc(ALLOC_ZERO);
+		if (page == NULL) 
+			return NULL;
+		
+		page->pp_ref += 1;
+		pte_t *pgtab = (pte_t *) page2kva(page);
+		*pgtab_entry = PADDR(pgtab) | PTE_U | PTE_W | PTE_P;  // more permissive PDE
+		return &pgtab[PTX(va)];
+	}
+
+	// return the pointer to large page table entry
+	if (*pgtab_entry & PTE_PS) 
+		return pgtab_entry;
+
+	// get the pointer to page table
+	pte_t *pgtab = (pte_t *) KADDR(PTE_ADDR(*pgtab_entry));
+	// return the pointer to page table entry
+	return &pgtab[PTX(va)];
 }
 
 //
@@ -402,6 +427,16 @@ static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
 	// Fill this function in
+	assert(va % PGSIZE == 0 && size % PGSIZE == 0 && pa % PGSIZE == 0 );
+	size_t pagenum = PGNUM(size);
+	for (size_t i = 0; i < pagenum; i++) {
+		pte_t *pte = pgdir_walk(pgdir, (void *) (va + i * PGSIZE), true);
+		if (pte == NULL) 
+			panic("boot_map_region: pgdir_walk failed");
+		if (*pte & PTE_P) 
+			panic("boot_map_region: remap a virtual address");
+		*pte = (pa + i * PGSIZE) | perm | PTE_P;
+	}
 }
 
 //
@@ -419,6 +454,13 @@ static void
 boot_map_region_large(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
 	// Fill this function in
+	size_t pagenum = size >> PDXSHIFT;
+	for (size_t i = 0; i < pagenum; i++) {
+		pte_t *pte = &pgdir[PDX(va + i * PTSIZE)];
+		if (*pte & PTE_P) 
+			panic("boot_map_region_large: remap a virtual address");
+		*pte = (pa + i * PGSIZE) | perm | PTE_P | PTE_PS;
+	}
 }
 
 //
@@ -450,6 +492,22 @@ int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
 	// Fill this function in
+	pte_t *pte = pgdir_walk(pgdir, va, true);
+
+	if (pte == NULL) 
+		return -E_NO_MEM;
+
+	// in case of re-add pp_ref when pp is re-inserted at the same va
+	pp->pp_ref += 1;
+
+	// A page has already mapped at 'va', it should be removed
+	if (*pte & PTE_P) {
+		assert(!(*pte & PTE_PS));  // large page should not be evicted
+		page_remove(pgdir, va);
+		tlb_invalidate(pgdir, va);
+	}
+
+	*pte = page2pa(pp) | perm | PTE_P;
 	return 0;
 }
 
@@ -468,7 +526,17 @@ struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
 	// Fill this function in
-	return NULL;
+	pte_t *pte = pgdir_walk(pgdir, va, false);
+	if (pte == NULL || !(*pte & PTE_P)) 
+		return NULL;
+	if (pte_store) 
+		*pte_store = pte;
+	struct PageInfo *page;
+	if (*pte & PTE_PS) 
+		page = pa2page(PDX(*pte) << PDXSHIFT);
+	else 
+		page = pa2page(PTE_ADDR(*pte));
+	return page;
 }
 
 //
@@ -490,6 +558,17 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	// Fill this function in
+	pte_t *pte_store = NULL;
+	struct PageInfo *page = page_lookup(pgdir, va, &pte_store);
+
+	// no physical page, do nothing
+	if (page == NULL) 
+		return;
+
+	assert(pte_store != NULL);
+	page_decref(page);
+	*pte_store = 0;
+	tlb_invalidate(pgdir, va);
 }
 
 //
