@@ -29,6 +29,7 @@ static struct Command commands[] = {
 	{ "time", "Counts the program's running time", mon_time},
 	{ "showmappings", "Display physical page mappings", mon_showmappings},
 	{ "modifymapping", "Modify any mapping in the current address space", mon_modifymapping},
+	{ "memdump", "Dump the contents of a range of memory", mon_memdump},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -255,7 +256,45 @@ mon_modifymapping(int argc, char **argv, struct Trapframe *tf)
 		vaddr = ROUNDDOWN(vaddr, PGSIZE);
 		paddr = ROUNDDOWN(paddr, PGSIZE);
 		pte_t *pte = pgdir_walk(kern_pgdir, (void *)vaddr, true);
+		assert(pte != NULL);
 		*pte = paddr | perm;
+	}
+
+	return 0;
+}
+
+int
+mon_memdump(int argc, char **argv, struct Trapframe *tf)
+{
+	if (argc != 4) {
+		cprintf("The usage is: memdump [-v/p] [start_addr] [end_addr]\n");
+		return 0;
+	}
+
+	uintptr_t start_addr = strtol(argv[2], NULL, 16);
+	uintptr_t end_addr = strtol(argv[3], NULL, 16);
+
+	if (start_addr > end_addr) {
+		cprintf("memdump: start address should be less than end address\n");
+		return 0;
+	}
+
+	start_addr = ROUNDDOWN(start_addr, 4);
+	end_addr = ROUNDUP(end_addr, 4);
+
+	cprintf("Start memdump:\n");
+	if (!strcmp(argv[1], "-v")) {
+		for (uintptr_t i = start_addr; i < end_addr; i += 4) {
+			cprintf("0x%08x: %08x\n", i, *(size_t *)i);
+		}
+	} else if (!strcmp(argv[1], "-p")) {
+		for (physaddr_t i = start_addr; i < end_addr; i += 4) {
+			size_t *vaddr = KADDR(i);
+			cprintf("0x%08x: %08x\n", vaddr, *vaddr);
+		}
+	} else {
+		cprintf("The usage is: memdump [-v/p] [start_addr] [end_addr]\n");
+		return 0;
 	}
 
 	return 0;
