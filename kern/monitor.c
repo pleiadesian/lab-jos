@@ -10,6 +10,7 @@
 #include <kern/console.h>
 #include <kern/monitor.h>
 #include <kern/kdebug.h>
+#include <kern/pmap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -26,6 +27,7 @@ static struct Command commands[] = {
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
 	{ "readebp", "Display the value of ebp", mon_readebp},
 	{ "time", "Counts the program's running time", mon_time},
+	{ "showmappings", "Display physical page mappings", mon_showmappings},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -172,6 +174,54 @@ mon_time(int argc, char **argv, struct Trapframe *tf)
 	}
 
 	cprintf("Unknown command '%s'\n", argv[1]);
+	return 0;
+}
+
+int
+mon_showmappings(int argc, char **argv, struct Trapframe *tf)
+{
+	if (argc != 3) {
+		cprintf("The usage is: showmappings [start_virtual_addr] [end_virtual_addr]");
+		return 0;
+	}
+
+	uintptr_t start_addr = strtol(argv[1], NULL, 16);
+	uintptr_t end_addr = strtol(argv[2], NULL, 16);
+
+	if (start_addr > end_addr) {
+		cprintf("showmappings: start address should be less than end address");
+		return 0;
+	}
+
+	start_addr = start_addr > KERNBASE ? ROUNDDOWN(start_addr, PTSIZE)
+										: ROUNDDOWN(start_addr, PGSIZE);
+	end_addr = end_addr > KERNBASE ? ROUNDDOWN(end_addr, PTSIZE)
+									: ROUNDDOWN(end_addr, PGSIZE);
+
+	cprintf("Start showmappings:\n");
+	uintptr_t i;
+	for (i = start_addr; i <= end_addr; i += PGSIZE) {
+		if (i >= KERNBASE) 
+			break;
+		pte_t *pte = pgdir_walk(kern_pgdir, (void *)i, false);
+		if (pte == NULL || !((*pte) & PTE_P)) 
+			cprintf("  0x%08x\tnot mapped\n", i);
+		else
+			cprintf("  0x%08x\t0x%08x PTE_U:%d PTE_W:%d\n", i, PTE_ADDR(pte),
+					((*pte) & PTE_U) > 0, ((*pte) & PTE_W) > 0);
+    }
+
+	// walk large page
+	for (; i <= end_addr && i >= KERNBASE; i += PTSIZE) {
+		pte_t *pte = &kern_pgdir[PDX(i)];
+		assert(!(*pte & PTE_P) || ((*pte) & PTE_PS));
+		if (pte == NULL || !((*pte) & PTE_P)) 
+			cprintf("  0x%08x\tnot mapped\n", i);
+		else 
+			cprintf("  0x%08x\t0x%08x PTE_U:%d PTE_W:%d PTE_PS:1\n", i, (*pte) & ~0x3FFFFF,
+					((*pte) & PTE_U) > 0, ((*pte) & PTE_W) > 0);
+	}
+
 	return 0;
 }
 
