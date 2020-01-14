@@ -28,6 +28,7 @@ static struct Command commands[] = {
 	{ "readebp", "Display the value of ebp", mon_readebp},
 	{ "time", "Counts the program's running time", mon_time},
 	{ "showmappings", "Display physical page mappings", mon_showmappings},
+	{ "modifymapping", "Modify any mapping in the current address space", mon_modifymapping},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -181,7 +182,7 @@ int
 mon_showmappings(int argc, char **argv, struct Trapframe *tf)
 {
 	if (argc != 3) {
-		cprintf("The usage is: showmappings [start_virtual_addr] [end_virtual_addr]");
+		cprintf("The usage is: showmappings [start_virtual_addr] [end_virtual_addr]\n");
 		return 0;
 	}
 
@@ -189,13 +190,13 @@ mon_showmappings(int argc, char **argv, struct Trapframe *tf)
 	uintptr_t end_addr = strtol(argv[2], NULL, 16);
 
 	if (start_addr > end_addr) {
-		cprintf("showmappings: start address should be less than end address");
+		cprintf("showmappings: start address should be less than end address\n");
 		return 0;
 	}
 
-	start_addr = start_addr > KERNBASE ? ROUNDDOWN(start_addr, PTSIZE)
+	start_addr = start_addr >= KERNBASE ? ROUNDDOWN(start_addr, PTSIZE)
 										: ROUNDDOWN(start_addr, PGSIZE);
-	end_addr = end_addr > KERNBASE ? ROUNDDOWN(end_addr, PTSIZE)
+	end_addr = end_addr >= KERNBASE ? ROUNDDOWN(end_addr, PTSIZE)
 									: ROUNDDOWN(end_addr, PGSIZE);
 
 	cprintf("Start showmappings:\n");
@@ -207,7 +208,7 @@ mon_showmappings(int argc, char **argv, struct Trapframe *tf)
 		if (pte == NULL || !((*pte) & PTE_P)) 
 			cprintf("  0x%08x\tnot mapped\n", i);
 		else
-			cprintf("  0x%08x\t0x%08x PTE_U:%d PTE_W:%d\n", i, PTE_ADDR(pte),
+			cprintf("  0x%08x\t0x%08x PTE_U:%d PTE_W:%d\n", i, PTE_ADDR(*pte),
 					((*pte) & PTE_U) > 0, ((*pte) & PTE_W) > 0);
     }
 
@@ -220,6 +221,41 @@ mon_showmappings(int argc, char **argv, struct Trapframe *tf)
 		else 
 			cprintf("  0x%08x\t0x%08x PTE_U:%d PTE_W:%d PTE_PS:1\n", i, (*pte) & ~0x3FFFFF,
 					((*pte) & PTE_U) > 0, ((*pte) & PTE_W) > 0);
+	}
+
+	return 0;
+}
+
+int 
+mon_modifymapping(int argc, char **argv, struct Trapframe *tf)
+{
+	if (argc != 4) {
+		cprintf("The usage is: modifymapping [virtual_addr] [physical_addr] [permission bits]\n");
+		return 0;
+	}
+
+	uintptr_t vaddr = strtol(argv[1], NULL, 16);
+	uintptr_t paddr = strtol(argv[2], NULL, 16);
+	int perm = strtol(argv[3], NULL, 10);
+	if (perm > 0x1ff) {
+		cprintf("modifymapping: perm is illegal\n");
+		return 0;
+	}
+
+	if (vaddr >= KERNBASE) {
+		vaddr = ROUNDDOWN(vaddr, PTSIZE);
+		paddr = ROUNDDOWN(paddr, PTSIZE);
+		pte_t *pte = &kern_pgdir[PDX(vaddr)];
+		if (!(perm & PTE_PS)) {
+			cprintf("modifymapping: do not map 4K page at virtual address above KERNBASE\n");
+			return 0;
+		}
+		*pte = paddr | perm;
+	} else {
+		vaddr = ROUNDDOWN(vaddr, PGSIZE);
+		paddr = ROUNDDOWN(paddr, PGSIZE);
+		pte_t *pte = pgdir_walk(kern_pgdir, (void *)vaddr, true);
+		*pte = paddr | perm;
 	}
 
 	return 0;
