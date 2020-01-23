@@ -286,16 +286,11 @@ region_alloc(struct Env *e, void *va, size_t len)
 	uintptr_t vaddr_start = ROUNDDOWN((uintptr_t)va, PGSIZE);
 	uintptr_t vaddr_end = ROUNDUP((uintptr_t)va + len, PGSIZE);
 	for (uintptr_t i = vaddr_start; i < vaddr_end; i += PGSIZE) {
-		// assert((!(e->env_pgdir[PDX(i)] & PTE_P)) || (!(e->env_pgdir[PDX(i)] & PTE_PS)));
-		// pte_t *pte = pgdir_walk(e->env_pgdir, (void *)i, true);
-		// if (pte == NULL || *pte & PTE_P)
-			// panic("region_alloc: pgdir_walk failed");
 		struct PageInfo *page = page_alloc(0);
 		if (page == NULL) 
 			panic("region_alloc: page_alloc failed");
 		if ((r = page_insert(e->env_pgdir, page, (void *)i, PTE_W | PTE_U)) < 0)
 			panic("region_alloc: %e", r);
-		// *pte = page2pa(page) | PTE_W | PTE_U;
 	}
 }
 
