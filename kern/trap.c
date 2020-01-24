@@ -86,7 +86,7 @@ trap_init(void)
 	SETGATE(idt[T_DIVIDE], 1, GD_KT, divide_handler, 0);
 	SETGATE(idt[T_DEBUG], 1, GD_KT, debug_handler, 0);
 	SETGATE(idt[T_NMI], 0, GD_KT, nmi_handler, 0);
-	SETGATE(idt[T_BRKPT], 1, GD_KT, brkpt_handler, 0);
+	SETGATE(idt[T_BRKPT], 1, GD_KT, brkpt_handler, 3);
 	SETGATE(idt[T_OFLOW], 1, GD_KT, oflow_handler, 0);
 	SETGATE(idt[T_BOUND], 1, GD_KT, bound_handler, 0);
 	SETGATE(idt[T_ILLOP], 1, GD_KT, illop_handler, 0);
@@ -180,8 +180,15 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-	if (tf->tf_trapno == T_PGFLT) {
-		page_fault_handler(tf);
+	switch (tf->tf_trapno) {
+		case T_PGFLT: {
+			page_fault_handler(tf);
+			return;
+		}
+		case T_BRKPT: {
+			monitor(tf);
+			return;
+		}
 	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
@@ -247,7 +254,6 @@ page_fault_handler(struct Trapframe *tf)
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
-
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",
