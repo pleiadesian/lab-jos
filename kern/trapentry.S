@@ -67,6 +67,40 @@ TRAPHANDLER_NOEC(simderr_handler, T_SIMDERR)
 TRAPHANDLER_NOEC(syscall_handler, T_SYSCALL)
 
 
+; .globl		sysenter_handler
+; .type		sysenter_handler, @function
+; sysenter_handler:
+; 	# save user data segment
+; 	pushl	%ds
+; 	pushl	%es
+; 	# set up kernel data segment
+; 	movl	$GD_KD, %eax
+; 	movw	%ax, %ds
+; 	movw	%ax, %es
+; 	# save return esp
+; 	pushl	%ebp
+; 	# save return pc
+; 	pushl	%esi
+; 	# push syscall arguments
+; 	pushl	%edi
+; 	pushl	%ebx
+; 	pushl	%ecx
+; 	pushl	%edx
+; 	pushl	%eax
+; 	call	syscall
+; 	add		$20, %esp
+; 	# sysexit set EIP to EDX
+; 	popl	%edx
+; 	# sysexit set ESP to ECX
+; 	popl	%ecx
+; 	# recover user data segment
+; 	popl	%es
+; 	popl	%ds
+; 	# enable interrupts when returning to the user process, which sysexit doesn't do
+; 	sti
+; 	sysexit
+
+
 /*
  * Lab 3: Your code here for _alltraps
  */

@@ -3,6 +3,10 @@
 
 #include <inc/types.h>
 
+#define IA32_SYSENTER_CS	0x174
+#define IA32_SYSENTER_ESP	0x175
+#define IA32_SYSENTER_EIP	0x176
+
 static inline void
 breakpoint(void)
 {
@@ -231,6 +235,14 @@ read_eip(void)
 	uint32_t eip;
 	asm volatile ("movl 4(%%ebp),%0" : "=r"(eip));
 	return eip;
+}
+
+static inline void
+wrmsr(uint32_t msr, uint32_t val1, uint32_t val2)
+{
+	asm volatile("wrmsr"
+				:
+				: "c" (msr), "a" (val1), "d" (val2));
 }
 
 static inline void
