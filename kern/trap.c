@@ -180,6 +180,9 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+	if (tf->tf_trapno == T_PGFLT) {
+		page_fault_handler(tf);
+	}
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
@@ -244,6 +247,7 @@ page_fault_handler(struct Trapframe *tf)
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
+
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",
