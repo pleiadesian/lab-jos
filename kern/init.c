@@ -12,7 +12,7 @@
 #include <kern/env.h>
 #include <kern/trap.h>
 
-// void sysenter_handler();
+void sysenter_handler();
 
 void
 i386_init(void)
@@ -45,10 +45,10 @@ i386_init(void)
 
 	// Lab 3 user environment initialization functions
 	// set up MSRs for sysenter
-	// wrmsr(IA32_SYSENTER_CS, GD_KT, 0);
-	// wrmsr(IA32_SYSENTER_CS + 8, GD_KD, 0);
-	// wrmsr(IA32_SYSENTER_EIP, (uintptr_t)sysenter_handler, 0);
-	// wrmsr(IA32_SYSENTER_ESP, KSTACKTOP, 0);
+	wrmsr(IA32_SYSENTER_CS, GD_KT, 0);
+	wrmsr(IA32_SYSENTER_CS + 8, GD_KD, 0);
+	wrmsr(IA32_SYSENTER_EIP, (uintptr_t)sysenter_handler, 0);
+	wrmsr(IA32_SYSENTER_ESP, KSTACKTOP, 0);
 	env_init();
 	trap_init();
 
