@@ -235,6 +235,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_type = ENV_TYPE_USER;
 	e->env_status = ENV_RUNNABLE;
 	e->env_runs = 0;
+	e->env_brk = UTEXT;
 
 	// Clear out all the saved register state,
 	// to prevent the register values
@@ -363,6 +364,8 @@ load_icode(struct Env *e, uint8_t *binary)
 		region_alloc(e, (void *)ph->p_va, ph->p_memsz);
 		memmove((void *)ph->p_va, binary + ph->p_offset, ph->p_filesz);
 		memset((void *)(ph->p_va + ph->p_filesz), 0, ph->p_memsz - ph->p_filesz);
+		uintptr_t endaddr = ROUNDUP(ph->p_va + ph->p_memsz, PGSIZE);
+		e->env_brk = endaddr > e->env_brk ? endaddr : e->env_brk;
 	}
 
 
@@ -397,7 +400,6 @@ env_create(uint8_t *binary, enum EnvType type)
 
 	load_icode(env, binary);
 	env->env_type = type;
-	env->env_parent_id = 0;
 }
 
 //
