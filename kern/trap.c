@@ -265,6 +265,10 @@ page_fault_handler(struct Trapframe *tf)
 	fault_va = rcr2();
 
 	// Handle kernel-mode page faults.
+	if ((tf->tf_cs & 3) == 0) {
+		panic("page_fault_handler: page fault happens in kernel mode");
+	}
+	assert((tf->tf_cs & 3) == 3);
 
 	// LAB 3: Your code here.
 

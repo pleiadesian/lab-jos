@@ -12,6 +12,7 @@
 #include <kern/kdebug.h>
 #include <kern/trap.h>
 #include <kern/pmap.h>
+#include <kern/env.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -31,6 +32,7 @@ static struct Command commands[] = {
 	{ "showmappings", "Display physical page mappings", mon_showmappings},
 	{ "modifymapping", "Modify any mapping in the current address space", mon_modifymapping},
 	{ "memdump", "Dump the contents of a range of memory", mon_memdump},
+	{ "backtrace", "Stack backtrace", mon_backtrace},
 };
 
 /***** Implementations of basic kernel monitor commands *****/
@@ -125,8 +127,14 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	ebp = (uint32_t *)read_ebp();
 	while (ebp != (uint32_t *)0) {
 		// get return address and 5 arguments from 8 bytes offset
-		for (int i = 0 ; i < 5 ; i++) 
+		for (int i = 0 ; i < 5 ; i++) {
+			// check
+			pte_t *pte = pgdir_walk(curenv->env_pgdir, ebp + 2 + i, false);
+			if (pte == NULL || !((*pte) & PTE_P)) 
+				break;
 			args[i] = *(ebp + 2 + i);
+		} 
+			
 		cprintf("  eip %08x  ebp %08x  args %08x %08x %08x %08x %08x\n",
 				eip, ebp, args[0], args[1], args[2], args[3], args[4]);
 

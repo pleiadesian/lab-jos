@@ -70,13 +70,15 @@ TRAPHANDLER_NOEC(simderr_handler, T_SIMDERR)
 .globl		sysenter_handler
 .type		sysenter_handler, @function
 sysenter_handler:
+	# save return PC
+	pushl	%esi
+	# save return ESP
+	pushl	%ebp
+	# set ESP
+	movl	%esp, %ebp
 	# save user data segment
 	pushl	%ds
 	pushl	%es
-	# save return esp
-	pushl	%ebp
-	# save return pc
-	pushl	%esi
 	# push syscall arguments
 	pushl	%edi
 	pushl	%ebx
@@ -89,13 +91,13 @@ sysenter_handler:
 	movw	%ax, %es
 	call	syscall
 	add		$20, %esp
-	# sysexit set EIP to EDX
-	popl	%edx
-	# sysexit set ESP to ECX
-	popl	%ecx
 	# recover user data segment
 	popl	%es
 	popl	%ds
+	# sysexit set ESP to ECX
+	popl	%ecx
+	# sysexit set EIP to EDX
+	popl	%edx
 	# enable interrupts when returning to the user process, which sysexit doesn't do
 	# sti
 	sysexit
