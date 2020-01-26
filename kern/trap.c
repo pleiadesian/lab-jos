@@ -65,6 +65,26 @@ static const char *trapname(int trapno)
 	return "(unknown trap)";
 }
 
+void divide_handler();
+void debug_handler();
+void nmi_handler();
+void brkpt_handler();
+void oflow_handler();
+void bound_handler();
+void illop_handler();
+void device_handler();
+void dblflt_handler();
+void tss_handler();
+void segnp_handler();
+void stack_handler();
+void gpflt_handler();
+void pgflt_handler();
+void fperr_handler();
+void align_handler();
+void mchk_handler();
+void simderr_handler();
+// void syscall_handler();
+void sysenter_handler();
 
 void
 trap_init(void)
@@ -72,6 +92,26 @@ trap_init(void)
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+	SETGATE(idt[T_DIVIDE], 1, GD_KT, divide_handler, 0);
+	SETGATE(idt[T_DEBUG], 1, GD_KT, debug_handler, 0);
+	SETGATE(idt[T_NMI], 0, GD_KT, nmi_handler, 0);
+	SETGATE(idt[T_BRKPT], 1, GD_KT, brkpt_handler, 3);
+	SETGATE(idt[T_OFLOW], 1, GD_KT, oflow_handler, 0);
+	SETGATE(idt[T_BOUND], 1, GD_KT, bound_handler, 0);
+	SETGATE(idt[T_ILLOP], 1, GD_KT, illop_handler, 0);
+	SETGATE(idt[T_DEVICE], 1, GD_KT, device_handler, 0);
+	SETGATE(idt[T_DBLFLT], 1, GD_KT, dblflt_handler, 0);
+	SETGATE(idt[T_TSS], 1, GD_KT, tss_handler, 0);
+	SETGATE(idt[T_SEGNP], 1, GD_KT, segnp_handler, 0);
+	SETGATE(idt[T_STACK], 1, GD_KT, stack_handler, 0);
+	SETGATE(idt[T_GPFLT], 1, GD_KT, gpflt_handler, 0);
+	SETGATE(idt[T_PGFLT], 1, GD_KT, pgflt_handler, 0);
+	SETGATE(idt[T_FPERR], 1, GD_KT, fperr_handler, 0);
+	SETGATE(idt[T_ALIGN], 1, GD_KT, align_handler, 0);
+	SETGATE(idt[T_MCHK], 1, GD_KT, mchk_handler, 0);
+	SETGATE(idt[T_SIMDERR], 1, GD_KT, simderr_handler, 0);
+	// SETGATE(idt[T_SYSCALL], 1, GD_KT, syscall_handler, 3);
+	SETGATE(idt[T_SYSCALL], 1, GD_KT, sysenter_handler, 3);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -176,6 +216,28 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+	switch (tf->tf_trapno) {
+		case T_PGFLT: {
+			page_fault_handler(tf);
+			return;
+		}
+		case T_BRKPT: {
+			monitor(tf);
+			return;
+		}
+		// case T_SYSCALL: {
+		// 	uint32_t eax, edx, ecx, ebx, edi, esi;
+		// 	eax = tf->tf_regs.reg_eax;
+		// 	edx = tf->tf_regs.reg_edx;
+		// 	ecx = tf->tf_regs.reg_ecx;
+		// 	ebx = tf->tf_regs.reg_ebx;
+		// 	edi = tf->tf_regs.reg_edi;
+		// 	esi = tf->tf_regs.reg_esi;
+		// 	uint32_t ret = syscall(eax, edx, ecx, ebx, edi, esi);
+		// 	asm volatile("movl %0,%%eax" : : "r" (ret));
+		// 	return;
+		// }
+	}
 
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
@@ -269,6 +331,10 @@ page_fault_handler(struct Trapframe *tf)
 	fault_va = rcr2();
 
 	// Handle kernel-mode page faults.
+	if ((tf->tf_cs & 3) == 0) {
+		panic("page_fault_handler: page fault happens in kernel mode");
+	}
+	assert((tf->tf_cs & 3) == 3);
 
 	// LAB 3: Your code here.
 

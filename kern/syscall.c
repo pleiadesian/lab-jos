@@ -22,6 +22,7 @@ sys_cputs(const char *s, size_t len)
 	// Destroy the environment if not.
 
 	// LAB 3: Your code here.
+	user_mem_assert(curenv, s, len, 0);
 
 	// Print the string supplied by the user.
 	cprintf("%.*s", len, s);
@@ -278,7 +279,21 @@ static int
 sys_sbrk(uint32_t inc)
 {
     // LAB3: your code here.
-    return 0;
+	uintptr_t brk_inc = ROUNDUP(curenv->env_brk + inc, PGSIZE);
+	if (brk_inc >= USTACKTOP) 
+		panic("sys_sbrk: out of memory");
+
+	int r;
+	for (uintptr_t i = curenv->env_brk; i < brk_inc; i += PGSIZE) {
+		struct PageInfo *page = page_alloc(0);
+		if (page == NULL) 
+			panic("sys_sbrk: page_alloc failed");
+		if ((r = page_insert(curenv->env_pgdir, page, (void *)i, PTE_W | PTE_U)) < 0) 
+			panic("sys_sbrk: %e", r); 
+	}
+
+	curenv->env_brk = brk_inc;
+    return brk_inc;
 }
 
 // Dispatches to the correct kernel function, passing the arguments.
@@ -289,11 +304,30 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// Return any appropriate return value.
 	// LAB 3: Your code here.
 
-	panic("syscall not implemented");
+	// panic("syscall not implemented");
 
 	switch (syscallno) {
-	default:
-		return -E_INVAL;
+		case SYS_cputs: {
+			sys_cputs((char *)a1, a2);
+			return 0;
+		}
+		case SYS_cgetc: {
+			return sys_cgetc();
+		}
+		case SYS_getenvid: {
+			return sys_getenvid();
+		}
+		case SYS_env_destroy: {
+			return sys_env_destroy(a1);
+		}
+		case SYS_map_kernel_page: {
+			return sys_map_kernel_page((void *)a1, (void *)a2);
+		}
+		case SYS_sbrk: {
+			return sys_sbrk(a1);
+		}
+		default:
+			return -E_INVAL;
 	}
 }
 

@@ -47,10 +47,75 @@
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
  */
+TRAPHANDLER_NOEC(divide_handler, T_DIVIDE)
+TRAPHANDLER_NOEC(debug_handler, T_DEBUG)
+TRAPHANDLER_NOEC(nmi_handler, T_NMI)
+TRAPHANDLER_NOEC(brkpt_handler, T_BRKPT)
+TRAPHANDLER_NOEC(oflow_handler, T_OFLOW)
+TRAPHANDLER_NOEC(bound_handler, T_BOUND)
+TRAPHANDLER_NOEC(illop_handler, T_ILLOP)
+TRAPHANDLER_NOEC(device_handler, T_DEVICE)
+TRAPHANDLER(dblflt_handler, T_DBLFLT)
+TRAPHANDLER(tss_handler, T_TSS)
+TRAPHANDLER(segnp_handler, T_SEGNP)
+TRAPHANDLER(stack_handler, T_STACK)
+TRAPHANDLER(gpflt_handler, T_GPFLT)
+TRAPHANDLER(pgflt_handler, T_PGFLT)
+TRAPHANDLER_NOEC(fperr_handler, T_FPERR)
+TRAPHANDLER_NOEC(align_handler, T_ALIGN)
+TRAPHANDLER_NOEC(mchk_handler, T_MCHK)
+TRAPHANDLER_NOEC(simderr_handler, T_SIMDERR)
+# TRAPHANDLER_NOEC(syscall_handler, T_SYSCALL)
 
+
+.globl		sysenter_handler
+.type		sysenter_handler, @function
+sysenter_handler:
+	# save return PC
+	pushl	%esi
+	# save return ESP
+	pushl	%ebp
+	# set ESP
+	movl	%esp, %ebp
+	# save user data segment
+	pushl	%ds
+	pushl	%es
+	# push syscall arguments
+	pushl	%edi
+	pushl	%ebx
+	pushl	%ecx
+	pushl	%edx
+	pushl	%eax
+	# set up kernel data segment
+	movl	$GD_KD, %eax
+	movw	%ax, %ds
+	movw	%ax, %es
+	call	syscall
+	add		$20, %esp
+	# recover user data segment
+	popl	%es
+	popl	%ds
+	# sysexit set ESP to ECX
+	popl	%ecx
+	# sysexit set EIP to EDX
+	popl	%edx
+	# enable interrupts when returning to the user process, which sysexit doesn't do
+	# sti
+	sysexit
 
 
 /*
  * Lab 3: Your code here for _alltraps
  */
-
+.globl		_alltraps
+.type		_alltraps, @function
+.align		2
+_alltraps:
+	pushl	%ds
+	pushl	%es
+	pushal
+	movl	$GD_KD, %eax
+	movw	%ax, %ds
+	movw	%ax, %es
+	pushl	%esp
+	call	trap
