@@ -323,8 +323,15 @@ page_init(void)
 
 	// The rest of base memory is free
 	assert(npages_basemem * PGSIZE == IOPHYSMEM);
+	size_t npages_mpentry = PGNUM(MPENTRY_PADDR);
 	size_t i;
 	for (i = 1; i < npages_basemem; i++) {
+		// Mark AP entry code page as in use
+		if (i == npages_mpentry) {
+			pages[i].pp_ref = 1;
+			pages[i].pp_link = NULL;
+			continue;
+		}
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
