@@ -595,7 +595,6 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 		return NULL;
 	if (pte_store) 
 		*pte_store = pte;
-	struct PageInfo *page;
 	assert (!(*pte & PTE_PS));
 	return pa2page(PTE_ADDR(*pte));
 }
