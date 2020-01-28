@@ -550,6 +550,7 @@ env_run(struct Env *e)
 		e->env_runs += 1;
 		lcr3(PADDR(e->env_pgdir));
 	}
+	unlock_kernel();
 	env_pop_tf(&e->env_tf);
 
 	// panic("env_run not yet implemented");

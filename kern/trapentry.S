@@ -65,7 +65,7 @@ TRAPHANDLER_NOEC(fperr_handler, T_FPERR)
 TRAPHANDLER_NOEC(align_handler, T_ALIGN)
 TRAPHANDLER_NOEC(mchk_handler, T_MCHK)
 TRAPHANDLER_NOEC(simderr_handler, T_SIMDERR)
-# TRAPHANDLER_NOEC(syscall_handler, T_SYSCALL)
+TRAPHANDLER_NOEC(syscall_handler, T_SYSCALL)
 
 
 .globl		sysenter_handler

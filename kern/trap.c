@@ -83,8 +83,8 @@ void fperr_handler();
 void align_handler();
 void mchk_handler();
 void simderr_handler();
-// void syscall_handler();
-void sysenter_handler();
+void syscall_handler();
+// void sysenter_handler();
 
 void
 trap_init(void)
@@ -110,8 +110,8 @@ trap_init(void)
 	SETGATE(idt[T_ALIGN], 1, GD_KT, align_handler, 0);
 	SETGATE(idt[T_MCHK], 1, GD_KT, mchk_handler, 0);
 	SETGATE(idt[T_SIMDERR], 1, GD_KT, simderr_handler, 0);
-	// SETGATE(idt[T_SYSCALL], 1, GD_KT, syscall_handler, 3);
-	SETGATE(idt[T_SYSCALL], 1, GD_KT, sysenter_handler, 3);
+	SETGATE(idt[T_SYSCALL], 1, GD_KT, syscall_handler, 3);
+	// SETGATE(idt[T_SYSCALL], 1, GD_KT, sysenter_handler, 3);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -165,10 +165,10 @@ trap_init_percpu(void)
 	lidt(&idt_pd);
 
 	// set MSRs
-	wrmsr(IA32_SYSENTER_CS, GD_KT, 0);
-	wrmsr(IA32_SYSENTER_CS + 8, GD_KD, 0);
-	wrmsr(IA32_SYSENTER_EIP, (uintptr_t)sysenter_handler, 0);
-	wrmsr(IA32_SYSENTER_ESP, thiscpu->cpu_ts.ts_esp0, 0);
+	// wrmsr(IA32_SYSENTER_CS, GD_KT, 0);
+	// wrmsr(IA32_SYSENTER_CS + 8, GD_KD, 0);
+	// wrmsr(IA32_SYSENTER_EIP, (uintptr_t)sysenter_handler, 0);
+	// wrmsr(IA32_SYSENTER_ESP, thiscpu->cpu_ts.ts_esp0, 0);
 
 	// Setup a TSS so that we get the right stack
 	// when we trap to the kernel.
@@ -249,18 +249,18 @@ trap_dispatch(struct Trapframe *tf)
 			monitor(tf);
 			return;
 		}
-		// case T_SYSCALL: {
-		// 	uint32_t eax, edx, ecx, ebx, edi, esi;
-		// 	eax = tf->tf_regs.reg_eax;
-		// 	edx = tf->tf_regs.reg_edx;
-		// 	ecx = tf->tf_regs.reg_ecx;
-		// 	ebx = tf->tf_regs.reg_ebx;
-		// 	edi = tf->tf_regs.reg_edi;
-		// 	esi = tf->tf_regs.reg_esi;
-		// 	uint32_t ret = syscall(eax, edx, ecx, ebx, edi, esi);
-		// 	asm volatile("movl %0,%%eax" : : "r" (ret));
-		// 	return;
-		// }
+		case T_SYSCALL: {
+			uint32_t eax, edx, ecx, ebx, edi, esi;
+			eax = tf->tf_regs.reg_eax;
+			edx = tf->tf_regs.reg_edx;
+			ecx = tf->tf_regs.reg_ecx;
+			ebx = tf->tf_regs.reg_ebx;
+			edi = tf->tf_regs.reg_edi;
+			esi = tf->tf_regs.reg_esi;
+			tf->tf_regs.reg_eax = syscall(eax, edx, ecx, ebx, edi, esi);
+			// asm volatile("movl %0,%%eax" : : "r" (ret));
+			return;
+		}
 	}
 
 	// Handle spurious interrupts
@@ -312,6 +312,7 @@ trap(struct Trapframe *tf)
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
 		// LAB 4: Your code here.
+		lock_kernel();
 		assert(curenv);
 
 		// Garbage collect if current enviroment is a zombie

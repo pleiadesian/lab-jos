@@ -11,6 +11,7 @@
 #include <kern/syscall.h>
 #include <kern/console.h>
 #include <kern/sched.h>
+#include <kern/spinlock.h>
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -68,6 +69,23 @@ sys_env_destroy(envid_t envid)
 static void
 sys_yield(void)
 {
+	// save trapframe
+	// struct Trapframe *tf;
+	// asm volatile("pushl %1\n"
+	// 			"pushl %2\n"
+	// 			"pushfl\n"
+	// 			"pushl %3\n"
+	// 			"pushl %4\n"
+	// 			"pushl $0\n"
+	// 			"pushl %5\n"
+	// 			"pushl %%es\n"
+	// 			"pushl %%ds\n"
+	// 			"pushal\n"
+	// 			"movl %%esp, %0\n"
+	// 			: "=a" (tf) 
+	// 			: "r" (GD_KD), "r" (esp - 24), "r" (GD_KT), "r" (pc), "r" (T_SYSCALL)  //, "r" (es), "r" (ds)
+	// 			: "memory");
+	// curenv->env_tf = *tf;
 	sched_yield();
 }
 
@@ -305,29 +323,43 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// LAB 3: Your code here.
 
 	// panic("syscall not implemented");
-
+	int32_t ret;
+	// lock_kernel();
 	switch (syscallno) {
 		case SYS_cputs: {
 			sys_cputs((char *)a1, a2);
-			return 0;
+			ret = 0;
+			break;
 		}
 		case SYS_cgetc: {
-			return sys_cgetc();
+			ret = sys_cgetc();
+			break;
 		}
 		case SYS_getenvid: {
-			return sys_getenvid();
+			ret = sys_getenvid();
+			break;
 		}
 		case SYS_env_destroy: {
-			return sys_env_destroy(a1);
+			ret = sys_env_destroy(a1);
+			break;
+		}
+		case SYS_yield: {
+			sys_yield();
+			ret = 0;
+			break;
 		}
 		case SYS_map_kernel_page: {
-			return sys_map_kernel_page((void *)a1, (void *)a2);
+			ret = sys_map_kernel_page((void *)a1, (void *)a2);
+			break;
 		}
 		case SYS_sbrk: {
-			return sys_sbrk(a1);
+			ret = sys_sbrk(a1);
+			break;
 		}
 		default:
-			return -E_INVAL;
+			ret = -E_INVAL;
 	}
+	// unlock_kernel();
+	return ret;
 }
 
