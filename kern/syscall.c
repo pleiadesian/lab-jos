@@ -352,16 +352,20 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 	if ((r = envid2env(envid, &env, false)) < 0) 
 		panic("envid2env: %e", r);
 
-	if (env->env_ipc_recving == 0) 
-		return -E_IPC_NOT_RECV;
+	if (env->env_ipc_recving == 0) { 
+		// return -E_IPC_NOT_RECV;
+		// not waked up until received
+		curenv->env_ipc_sending = 1;
+		curenv->env_status = ENV_NOT_RUNNABLE;
+		curenv->env_ipc_send_envid = envid;
+		curenv->env_ipc_send_value = value;
+		curenv->env_ipc_srcva = srcva;
+		curenv->env_ipc_send_perm = perm;
+		sched_yield();
+		return 0;
+	}
 
-	env->env_ipc_recving = 0;
-	env->env_ipc_from = curenv->env_id;
-	env->env_ipc_value = value;
-	env->env_ipc_perm = 0;
-	env->env_status = ENV_RUNNABLE;
-	env->env_tf.tf_regs.reg_eax = 0;
-	if (srcva != NULL && (uintptr_t)srcva < UTOP &&
+	if (srcva != NULL && (uintptr_t)srcva < UTOP && env->env_ipc_dstva != NULL &&
 		(uintptr_t)env->env_ipc_dstva < UTOP) {
 		if ((uintptr_t)srcva % PGSIZE) 
 			return -E_INVAL;
@@ -372,11 +376,18 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 		if (pp == NULL)
 			return -E_INVAL;
 		if ((perm & PTE_W) && !(*pte & PTE_W)) 
-			return -E_INVAL;
+			return -E_INVAL;		
 		if ((r = page_insert(env->env_pgdir, pp, env->env_ipc_dstva, perm)) < 0) 
 			return r;
 		env->env_ipc_perm = perm;
+	} else{
+		env->env_ipc_perm = 0;
 	}
+	env->env_ipc_recving = 0;
+	env->env_ipc_from = curenv->env_id;
+	env->env_ipc_value = value;
+	env->env_status = ENV_RUNNABLE;
+	env->env_tf.tf_regs.reg_eax = 0;
 	return 0;
 }
 
@@ -396,6 +407,7 @@ sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
 	// panic("sys_ipc_recv not implemented");
+	int r;
 	if (dstva != NULL && (uintptr_t)dstva < UTOP) {
 		if ((uintptr_t)dstva % PGSIZE) 
 			return -E_INVAL;
@@ -403,6 +415,59 @@ sys_ipc_recv(void *dstva)
 	} else {
 		curenv->env_ipc_dstva = NULL;
 	}
+
+	// traverse all envs to find pending senders
+	for (int i = 0; i < NENV; i++) {
+		if (envs[i].env_ipc_sending == 1 && envs[i].env_ipc_send_envid == curenv->env_id) {
+			void *srcva = envs[i].env_ipc_srcva;
+			int perm = envs[i].env_ipc_send_perm;
+			if (srcva != NULL && (uintptr_t)srcva < UTOP && dstva != NULL && (uintptr_t)dstva < UTOP) {
+				if ((uintptr_t)srcva % PGSIZE) {
+					envs[i].env_tf.tf_regs.reg_eax = -E_INVAL;
+					envs[i].env_ipc_sending = 0;
+					envs[i].env_status = ENV_RUNNABLE;
+					continue;
+				}
+				if ((perm & ~PTE_SYSCALL) || !(perm & PTE_U) || !(perm & PTE_P)) {
+					envs[i].env_tf.tf_regs.reg_eax = -E_INVAL;
+					envs[i].env_ipc_sending = 0;
+					envs[i].env_status = ENV_RUNNABLE;
+					continue;
+				}
+				pte_t *pte = NULL;
+				struct PageInfo *pp = page_lookup(envs[i].env_pgdir, srcva, &pte);
+				if (pp == NULL) {
+					envs[i].env_tf.tf_regs.reg_eax = -E_INVAL;
+					envs[i].env_ipc_sending = 0;
+					envs[i].env_status = ENV_RUNNABLE;
+					continue;
+				}
+				if ((perm & PTE_W) && !(*pte & PTE_W)) {
+					envs[i].env_tf.tf_regs.reg_eax = -E_INVAL;
+					envs[i].env_ipc_sending = 0;
+					envs[i].env_status = ENV_RUNNABLE;
+					continue;
+				}
+				if ((r = page_insert(curenv->env_pgdir, pp, dstva, perm)) < 0) {
+					envs[i].env_tf.tf_regs.reg_eax = r;
+					envs[i].env_ipc_sending = 0;
+					envs[i].env_status = ENV_RUNNABLE;
+					continue;
+				}
+				curenv->env_ipc_perm = perm;
+			} else {
+				curenv->env_ipc_perm = 0;
+			}
+			curenv->env_ipc_recving = 0;
+			curenv->env_ipc_from = envs[i].env_id;
+			curenv->env_ipc_value = envs[i].env_ipc_send_value;
+			envs[i].env_ipc_sending = 0;
+			envs[i].env_status = ENV_RUNNABLE;
+			envs[i].env_tf.tf_regs.reg_eax = 0;
+			return 0;
+		}
+	}
+
 	curenv->env_ipc_recving = 1;
 	curenv->env_status = ENV_NOT_RUNNABLE;
 	sched_yield();

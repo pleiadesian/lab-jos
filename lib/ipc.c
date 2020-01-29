@@ -55,18 +55,20 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 	// LAB 4: Your code here.
 	// panic("ipc_send not implemented");
 	int r;
-	bool not_recv = true;
+	// bool not_recv = true;
 	if (pg == NULL) 
 		pg = (void*)UTOP;
-	while (not_recv) {
-		if ((r = sys_ipc_try_send(to_env, val, pg, perm)) < 0) {
-			if (r != -E_IPC_NOT_RECV) 
-				panic("sys_ipc_try_send: %e", r);
-			sys_yield();
-		} else {
-			not_recv = false;
-		}
-	}
+	// while (not_recv) {
+	// 	if ((r = sys_ipc_try_send(to_env, val, pg, perm)) < 0) {
+	// 		if (r != -E_IPC_NOT_RECV) 
+	// 			panic("sys_ipc_try_send: %e", r);
+	// 		sys_yield();
+	// 	} else {
+	// 		not_recv = false;
+	// 	}
+	// }
+	if ((r = sys_ipc_try_send(to_env, val, pg, perm)) < 0) 
+		panic("sys_ipc_try_send: %e", r);
 }
 
 // Find the first environment of the given type.  We'll use this to
