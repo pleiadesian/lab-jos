@@ -63,7 +63,7 @@ KERN_BINFILES :=	user/hello \
 KERN_BINFILES +=	user/idle \
 			user/yield \
 			user/dumbfork \
-			# user/stresssched \
+			user/stresssched \
 			user/faultdie \
 			user/faultregs \
 			user/faultalloc \
