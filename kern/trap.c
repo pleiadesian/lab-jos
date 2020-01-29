@@ -84,7 +84,6 @@ void align_handler();
 void mchk_handler();
 void simderr_handler();
 void syscall_handler();
-// void sysenter_handler();
 void irq0_handler();
 void irq1_handler();
 void irq2_handler();
@@ -127,7 +126,6 @@ trap_init(void)
 	SETGATE(idt[T_MCHK], 0, GD_KT, mchk_handler, 0);
 	SETGATE(idt[T_SIMDERR], 0, GD_KT, simderr_handler, 0);
 	SETGATE(idt[T_SYSCALL], 0, GD_KT, syscall_handler, 3);
-	// SETGATE(idt[T_SYSCALL], 1, GD_KT, sysenter_handler, 3);
 	SETGATE(idt[IRQ_OFFSET + 0], 0, GD_KT, irq0_handler, 0);
 	SETGATE(idt[IRQ_OFFSET + 1], 0, GD_KT, irq1_handler, 0);
 	SETGATE(idt[IRQ_OFFSET + 2], 0, GD_KT, irq2_handler, 0);
@@ -195,30 +193,6 @@ trap_init_percpu(void)
 
 	// Load the IDT
 	lidt(&idt_pd);
-
-	// set MSRs
-	// wrmsr(IA32_SYSENTER_CS, GD_KT, 0);
-	// wrmsr(IA32_SYSENTER_CS + 8, GD_KD, 0);
-	// wrmsr(IA32_SYSENTER_EIP, (uintptr_t)sysenter_handler, 0);
-	// wrmsr(IA32_SYSENTER_ESP, thiscpu->cpu_ts.ts_esp0, 0);
-
-	// Setup a TSS so that we get the right stack
-	// when we trap to the kernel.
-	// ts.ts_esp0 = KSTACKTOP;
-	// ts.ts_ss0 = GD_KD;
-	// ts.ts_iomb = sizeof(struct Taskstate);
-
-	// Initialize the TSS slot of the gdt.
-	// gdt[GD_TSS0 >> 3] = SEG16(STS_T32A, (uint32_t) (&ts),
-	// 				sizeof(struct Taskstate) - 1, 0);
-	// gdt[GD_TSS0 >> 3].sd_s = 0;
-
-	// Load the TSS selector (like other segment selectors, the
-	// bottom three bits are special; we leave them 0)
-	// ltr(GD_TSS0);
-
-	// Load the IDT
-	// lidt(&idt_pd);
 }
 
 void

@@ -19,22 +19,6 @@ syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// The last clause tells the assembler that this can
 	// potentially change the condition codes and arbitrary
 	// memory locations.
-
-	// asm volatile("pushl	%%ebp\n"
-	// 			"movl	%%esp, %%ebp\n"
-	// 			"leal	after_sysenter_label%=, %%esi\n"
-	// 			"sysenter\n"
-	// 			"after_sysenter_label%=:\n"
-	// 			"popl	%%ebp\n"
-	// 			: "=a" (ret)
-	// 			: "i" (T_SYSCALL),
-	// 			"a" (num),
-	// 			"d" (a1),
-	// 			"c" (a2),
-	// 			"b" (a3),
-	// 			"D" (a4),
-	// 			"S" (a5)
-	// 			: "cc", "memory");
 	asm volatile("int %1\n"
 		     : "=a" (ret)
 		     : "i" (T_SYSCALL),

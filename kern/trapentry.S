@@ -116,7 +116,7 @@ sysenter_handler:
 	# sysexit set EIP to EDX
 	popl	%edx
 	# enable interrupts when returning to the user process, which sysexit doesn't do
-	# sti
+	sti
 	sysexit
 
 

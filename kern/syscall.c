@@ -69,23 +69,6 @@ sys_env_destroy(envid_t envid)
 static void
 sys_yield(void)
 {
-	// save trapframe
-	// struct Trapframe *tf;
-	// asm volatile("pushl %1\n"
-	// 			"pushl %2\n"
-	// 			"pushfl\n"
-	// 			"pushl %3\n"
-	// 			"pushl %4\n"
-	// 			"pushl $0\n"
-	// 			"pushl %5\n"
-	// 			"pushl %%es\n"
-	// 			"pushl %%ds\n"
-	// 			"pushal\n"
-	// 			"movl %%esp, %0\n"
-	// 			: "=a" (tf) 
-	// 			: "r" (GD_KD), "r" (esp - 24), "r" (GD_KT), "r" (pc), "r" (T_SYSCALL)  //, "r" (es), "r" (ds)
-	// 			: "memory");
-	// curenv->env_tf = *tf;
 	sched_yield();
 }
 
