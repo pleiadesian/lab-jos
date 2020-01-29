@@ -397,11 +397,11 @@ page_fault_handler(struct Trapframe *tf)
 	// LAB 4: Your code here.
 	if (curenv->env_pgfault_upcall != NULL) {
 		struct UTrapframe *utf = NULL;
-		if (tf->tf_esp == UXSTACKTOP) 
-			utf = (struct UTrapframe*)(UXSTACKTOP - sizeof(struct UTrapframe));
-		else 
+		if (tf->tf_esp >= UXSTACKTOP - PGSIZE && tf->tf_esp < UXSTACKTOP) 
 			utf = (struct UTrapframe*)(tf->tf_esp - sizeof(size_t) - sizeof(struct UTrapframe));
-
+		else 
+			utf = (struct UTrapframe*)(UXSTACKTOP - sizeof(struct UTrapframe));
+			
 		user_mem_assert(curenv->env_pgdir, utf, sizeof(struct UTrapframe), PTE_W);
 		utf->utf_fault_va = fault_va;
 		utf->utf_err = tf->tf_err;
