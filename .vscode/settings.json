@@ -1,5 +1,24 @@
 {
     "files.associations": {
-        "ctime": "c"
+        "ctime": "c",
+        "__bit_reference": "c",
+        "__config": "c",
+        "__hash_table": "c",
+        "__split_buffer": "c",
+        "algorithm": "c",
+        "array": "c",
+        "atomic": "c",
+        "functional": "c",
+        "hash_map": "c",
+        "initializer_list": "c",
+        "ios": "c",
+        "iterator": "c",
+        "locale": "c",
+        "sstream": "c",
+        "string": "c",
+        "string_view": "c",
+        "unordered_map": "c",
+        "utility": "c",
+        "vector": "c"
     }
 }

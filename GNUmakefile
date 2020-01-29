@@ -207,6 +207,11 @@ grade:
 	@echo $(MAKE) clean
 	@$(MAKE) clean || \
 	  (echo "'make clean' failed.  HINT: Do you have another running instance of JOS?" && exit 1)
+		mkdir -p obj/lib
+	gcc -pipe -nostdinc    -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -std=gnu99 -static -fno-pie -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_USER -gstabs -c -o obj/lib/pgfault.o lib/pgfault.c
+	gcc -pipe -nostdinc    -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -std=gnu99 -static -fno-pie -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_USER -gstabs -c -o obj/lib/pfentry.o lib/pfentry.S 
+	gcc -pipe -nostdinc    -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -std=gnu99 -static -fno-pie -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_USER -gstabs -c -o obj/lib/fork.o lib/fork.c 
+	gcc -pipe -nostdinc    -O1 -fno-builtin -I. -MD -fno-omit-frame-pointer -std=gnu99 -static -fno-pie -Wall -Wno-format -Wno-unused -Werror -gstabs -m32 -fno-tree-ch -fno-stack-protector -DJOS_USER -gstabs -c -o obj/lib/ipc.o lib/ipc.c
 	./grade-lab$(LAB) $(GRADEFLAGS)
 
 handin: tarball
