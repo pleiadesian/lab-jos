@@ -66,6 +66,9 @@ entry:
 	orl	$(CR0_PE|CR0_PG|CR0_WP), %eax
 	movl	%eax, %cr0
 	# Turn on page size extension.
+	movl	%cr4, %eax
+	orl 	$(CR4_PSE), %eax
+	movl	%eax, %cr4
 
 	# Now paging is enabled, but we're still running at a low EIP
 	# (why is this okay?).  Jump up above KERNBASE before entering

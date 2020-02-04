@@ -1,0 +1,21 @@
+1. What is the purpose of having an individual handler function for each exception/interrupt? (i.e., if all exceptions/interrupts were delivered to the same handler, what feature that exists in the current implementation could not be provided?)
+
+目的是对不同的异常和中断做出不同的处理。如缺页处理程序，可以由内核将需要的页换入内存中，使得程序能够在原指令位置继续执行。如果所有的异常和中断都被相同的处理程序处理，那么就无法区分异常和中断的类型并针对处理。
+
+
+
+2. Did you have to do anything to make the `user/softint` program behave correctly? The grade script expects it to produce a general protection fault (trap 13), but `softint`'s code says `int $14`. *Why* should this produce interrupt vector 13? What happens if the kernel actually allows `softint`'s `int $14` instruction to invoke the kernel's page fault handler (which is interrupt vector 14)?
+
+在添加trap entry后，没有做其他处理时，`user/softint`已经可以正确运行。trap 14(缺页异常)，只能由ring 0通过`int`调用。IDT检查到ring3级别的user没有权限调用trap 14，因此生成trap 13，即general protection fault。如果kernel允许user调用trap 14，那么在缺页处理程序中user环境会崩溃。
+
+
+
+3. The break point test case will either generate a break point exception or a general protection fault depending on how you initialized the break point entry in the IDT (i.e., your call to `SETGATE` from `trap_init`). Why? How do you need to set it up in order to get the breakpoint exception to work as specified above and what incorrect setup would cause it to trigger a general protection fault?
+
+user态执行`int $3`指令，如果IDT对应trap 3的entry的权限是ring 0，则触发general protection fault。将IDT对应trap 3的entry的权限置为ring 3，则可以正确触发breakpoint的trap。
+
+
+
+4. What do you think is the point of these mechanisms, particularly in light of what the `user/softint` test program does?
+
+对user态触发的trap和syscall进行不同的处理，使得内核能够处理不同的trap。对ring0和ring3的权限验证使得将恶意的用户发起的syscall或者是用户态的bug与对应的trap处理程序进行隔离，防止对操作系统造成损害。
