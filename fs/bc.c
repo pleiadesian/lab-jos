@@ -1,6 +1,8 @@
 
 #include "fs.h"
 
+#define EVICT_POLICY
+
 // Return the virtual address of this disk block.
 void*
 diskaddr(uint32_t blockno)
@@ -48,6 +50,7 @@ bc_pgfault(struct UTrapframe *utf)
 	// the disk.
 	//
 	// LAB 5: you code here:
+#ifndef EVICT_POLICY
 	addr = ROUNDDOWN(addr, PGSIZE);
 	if ((r = sys_page_alloc(0, addr, PTE_SYSCALL)) < 0)
 		panic("sys_page_alloc: %e", r);
@@ -65,6 +68,70 @@ bc_pgfault(struct UTrapframe *utf)
 	// in?)
 	if (bitmap && block_is_free(blockno))
 		panic("reading free block %08x\n", blockno);
+#else
+	static uint32_t clock_pointer = 0;
+	static uint32_t not_cold_cache = 0;
+
+	addr = ROUNDDOWN(addr, PGSIZE);
+	if (blockno <= 2) {
+		// super block should not be evicted
+		if ((r = sys_page_alloc(0, addr, PTE_SYSCALL)) < 0)
+			panic("sys_page_alloc: %e", r);		
+	} else if (not_cold_cache < BCSIZE) {
+		block_cache[not_cold_cache] = addr;
+		cprintf("put page %08x into block cache %d\n", (uintptr_t)addr, not_cold_cache);
+		not_cold_cache++;
+		if ((r = sys_page_alloc(0, addr, PTE_SYSCALL)) < 0)
+			panic("sys_page_alloc: %e", r);
+	} else {
+		// find victim page
+		bool victim_not_found = true;
+		void *victim_addr = NULL;
+		while (victim_not_found) {
+			uint32_t bc_pointer = clock_pointer % BCSIZE;
+			void *page_addr = block_cache[bc_pointer];
+			if (!(uvpt[PGNUM(page_addr)] & PTE_A)) {
+				victim_addr = page_addr;
+				block_cache[bc_pointer] = addr;
+				victim_not_found = false;
+				cprintf("evict page %08x from block cache %d\n", (uintptr_t)page_addr, bc_pointer);
+				cprintf("put page %08x into block cache %d\n", (uintptr_t)addr, bc_pointer);
+			} else {
+				// flush dirty page
+				if (uvpt[PGNUM(page_addr)] & PTE_D) 
+					flush_block(page_addr);
+				// reset access bit
+				if ((r = sys_page_map(0, page_addr, 0, page_addr,
+									uvpt[PGNUM(page_addr)] &
+									(PTE_SYSCALL))) < 0)
+					panic("sys_page_map: %e", r);
+				clock_pointer++;
+				cprintf("reset page %08x's access bit\n", (uintptr_t)page_addr);
+			}
+		}
+		// flush victim page
+		if (uvpt[PGNUM(victim_addr)] & PTE_D) 
+			flush_block(victim_addr);
+
+		// remap page to new candidate
+		if ((r = sys_page_map(0, victim_addr, 0, addr, PTE_SYSCALL)) < 0) 
+			panic("sys_page_map: %e", r); 
+
+		// unmap victim page
+		if ((r = sys_page_unmap(0, victim_addr)) < 0) 
+			panic("sys_page_unmap: %e", r);
+
+	}
+	if ((r = ide_read(blockno * BLKSECTS, addr, BLKSECTS)) < 0) 
+		panic("ide_read: %e", r);
+
+	// clear dirty bit
+	if ((r = sys_page_map(0, addr, 0, addr, PTE_SYSCALL)) < 0)
+		panic("in bc_pgfault, sys_page_map: %e", r);
+
+	if (bitmap && block_is_free(blockno))
+		panic("reading free block %08x\n", blockno);
+#endif
 }
 
 // Flush the contents of the block containing VA out to disk if
