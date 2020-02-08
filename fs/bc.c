@@ -1,7 +1,7 @@
 
 #include "fs.h"
 
-#define EVICT_POLICY
+// #define EVICT_POLICY
 
 // Return the virtual address of this disk block.
 void*
