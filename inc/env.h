@@ -54,7 +54,8 @@ struct Env {
 	unsigned env_status;		// Status of the environment
 	uint32_t env_runs;		// Number of times environment has run
 	int env_cpunum;			// The CPU that the env is running on
-
+	uintptr_t env_brk;			// break of this env
+	
 	// Address space
 	pde_t *env_pgdir;		// Kernel virtual address of page dir
 
@@ -67,6 +68,12 @@ struct Env {
 	uint32_t env_ipc_value;		// Data value sent to us
 	envid_t env_ipc_from;		// envid of the sender
 	int env_ipc_perm;		// Perm of page mapping received
+
+	bool env_ipc_sending;
+	envid_t env_ipc_send_envid;
+	uint32_t env_ipc_send_value;
+	void *env_ipc_srcva;
+	int env_ipc_send_perm;
 };
 
 #endif // !JOS_INC_ENV_H

@@ -302,6 +302,16 @@ static int
 copy_shared_pages(envid_t child)
 {
 	// LAB 5: Your code here.
+	int r;
+	for (uintptr_t addr = 0; addr < UTOP; addr += PGSIZE) {
+		// User exception stack should not be mapped
+		if (addr == UXSTACKTOP - PGSIZE) 
+			continue;
+		if ((uvpd[PDX(addr)] & PTE_P) && (uvpt[PGNUM(addr)] & PTE_P) && (uvpt[PGNUM(addr)] & PTE_SHARE)) {
+			if ((r = sys_page_map(0, (void*)addr, child, (void*)addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0) 
+				panic("sys_page_map: %e", r);
+		}
+	}
 	return 0;
 }
 
