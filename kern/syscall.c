@@ -521,7 +521,8 @@ static int
 sys_time_msec(void)
 {
 	// LAB 6: Your code here.
-	panic("sys_time_msec not implemented");
+	// panic("sys_time_msec not implemented");
+	return time_msec();
 }
 
 int
@@ -620,6 +621,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		}
 		case SYS_sbrk: {
 			ret = sys_sbrk(a1);
+			break;
+		}
+		case SYS_time_msec: {
+			ret = sys_time_msec();
 			break;
 		}
 		default:
