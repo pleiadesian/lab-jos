@@ -12,6 +12,7 @@ int
 e1000_tx_init()
 {
 	// Allocate one page for descriptors
+	
 
 	// Initialize all descriptors
 
@@ -42,6 +43,8 @@ int
 pci_e1000_attach(struct pci_func *pcif)
 {
 	// Enable PCI function
+	pci_func_enable(pcif);
+
 	// Map MMIO region and save the address in 'base;
 
 	e1000_tx_init();
