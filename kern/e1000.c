@@ -12,7 +12,7 @@ int
 e1000_tx_init()
 {
 	// Allocate one page for descriptors
-	
+
 
 	// Initialize all descriptors
 
@@ -46,6 +46,9 @@ pci_e1000_attach(struct pci_func *pcif)
 	pci_func_enable(pcif);
 
 	// Map MMIO region and save the address in 'base;
+	base = (struct E1000 *)mmio_map_region(pcif->reg_base[0], pcif->reg_size[0]);
+
+	cprintf("device status register: 0x%08x\n", base->STATUS);
 
 	e1000_tx_init();
 	e1000_rx_init();
