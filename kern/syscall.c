@@ -554,9 +554,7 @@ sys_net_recv(void *buf, uint32_t len)
 		return -E_INVAL;
 	if ((r = user_mem_check(curenv, buf, len, PTE_U | PTE_W)) < 0) 
 		return r;
-	if ((r = e1000_rx(buf, len)) < 0) 
-		return r;
-	return 0;
+	return e1000_rx(buf, len);
 }
 
 // Dispatches to the correct kernel function, passing the arguments.
@@ -643,6 +641,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		}
 		case SYS_net_send: {
 			ret = sys_net_send((void*)a1, a2);
+			break;
+		}
+		case SYS_net_recv: {
+			ret = sys_net_recv((void*)a1, a2);
 			break;
 		}
 		default:

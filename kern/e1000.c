@@ -131,5 +131,5 @@ e1000_rx(void *buf, uint32_t len)
 	desc->status &= ~E1000_RX_STATUS_DD;
 	base->RDT = rdt;
 
-	return 0;
+	return desc->length;
 }
