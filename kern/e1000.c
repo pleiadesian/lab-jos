@@ -8,7 +8,6 @@ static struct E1000 *base;
 struct tx_desc *tx_descs;
 #define N_TXDESC (PGSIZE / sizeof(struct tx_desc))
 #define TX_PACKET_SIZE 1518
-// struct tx_desc tx_descs[N_TXDESC] __attribute__((aligned(16)));
 char tx_packet_buffer[N_TXDESC][TX_PACKET_SIZE];
 
 int
@@ -18,10 +17,14 @@ e1000_tx_init()
 	struct PageInfo *pp = page_alloc(ALLOC_ZERO);
 	if (pp == NULL) 
 		panic("e1000_tx_init: out of memory");
-	tx_descs = page2kva(pp);
+	tx_descs = (struct tx_desc *)mmio_map_region(page2pa(pp), PGSIZE);
+	// tx_descs = page2kva(pp);
+
 	// page_insert(kern_pgdir, pp, tx_descs, PTE_PCD | PTE_PWT | PTE_W);
 	// tx_descs = (struct tx_desc *)KSTACKTOP;
 	// pte_t *pte = pgdir_walk(kern_pgdir, tx_descs, true);
+
+	
 
 	// Initialize all descriptors
 	for (int i = 0; i < N_TXDESC; i++) {
@@ -71,7 +74,7 @@ pci_e1000_attach(struct pci_func *pcif)
 	// Map MMIO region and save the address in 'base;
 	base = (struct E1000 *)mmio_map_region(pcif->reg_base[0], pcif->reg_size[0]);
 
-	// cprintf("device status register: 0x%08x\n", base->STATUS);
+	cprintf("device status register: 0x%08x\n", base->STATUS);
 
 	e1000_tx_init();
 	e1000_rx_init();
@@ -83,6 +86,16 @@ e1000_tx(const void *buf, uint32_t len)
 {
 	// Send 'len' bytes in 'buf' to ethernet
 	// Hint: buf is a kernel virtual address
+	uint32_t tdt = base->TDT;
+	struct tx_desc *desc = &tx_descs[tdt];
+	if (!desc->status & E1000_TX_STATUS_DD) 
+		return -E_AGAIN;
+
+	memset(tx_packet_buffer[tdt], '\0', TX_PACKET_SIZE);
+	memcpy(tx_packet_buffer[tdt], buf, len);
+	desc->length = len;
+	desc->status &= ~E1000_TX_STATUS_DD;
+	base->TDT = (base->TDT + 1) % N_TXDESC;
 
 	return 0;
 }
