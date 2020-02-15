@@ -20,6 +20,8 @@
         "unordered_map": "c",
         "utility": "c",
         "vector": "c",
-        "ostream": "c"
+        "ostream": "c",
+        "cstdlib": "c",
+        "new": "c"
     }
 }
