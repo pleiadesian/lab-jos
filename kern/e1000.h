@@ -67,7 +67,7 @@ struct tx_desc {
 };
 
 #define E1000_TX_CMD_EOP (1U)
-#define E1000_TX_CMD_RS (4U)
+#define E1000_TX_CMD_RS (8U)
 #define E1000_TX_STATUS_DD (1U)
 
 struct rx_desc {

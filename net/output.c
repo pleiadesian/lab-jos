@@ -26,8 +26,6 @@ output(envid_t ns_envid)
 			cprintf("output: the value sent by the sender is not NSREQ_OUTPUT\n");
 			continue;
 		}
-		while ((r = sys_net_send(nsipcbuf.pkt.jp_data, nsipcbuf.pkt.jp_len)) < 0) {
-			cprintf("sys_net_send: %e\n", r);
-		}
+		while ((r = sys_net_send(nsipcbuf.pkt.jp_data, nsipcbuf.pkt.jp_len)) < 0);
 	}
 }
