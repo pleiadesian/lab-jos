@@ -549,7 +549,14 @@ sys_net_recv(void *buf, uint32_t len)
 	// Check the user permission to [buf, buf + len]
 	// Call e1000_rx to fill the buffer
 	// Hint: e1000_rx only accept kernel virtual address
-	return -1;
+	int r;
+	if (len <= 0 || len > RX_PACKET_SIZE) 
+		return -E_INVAL;
+	if ((r = user_mem_check(curenv, buf, len, PTE_U | PTE_W)) < 0) 
+		return r;
+	if ((r = e1000_rx(buf, len)) < 0) 
+		return r;
+	return 0;
 }
 
 // Dispatches to the correct kernel function, passing the arguments.

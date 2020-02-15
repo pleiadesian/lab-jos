@@ -7,6 +7,7 @@
 #define E1000_DID 0x100e
 
 #define TX_PACKET_SIZE 1518
+#define RX_PACKET_SIZE 2048
 
 struct E1000 {
 	volatile uint32_t CTRL;             /* 0x00000  Device Control - RW */

@@ -19,6 +19,7 @@ e1000_tx_init()
 	tx_descs = (struct tx_desc *)mmio_map_region(page2pa(pp), PGSIZE);
 
 	// Initialize all descriptors
+	memset(tx_packet_buffer, '\0', N_TXDESC * TX_PACKET_SIZE);
 	for (int i = 0; i < N_TXDESC; i++) {
 		tx_descs[i].addr = PADDR(tx_packet_buffer[i]);
 		tx_descs[i].cmd = E1000_TX_CMD_RS | E1000_TX_CMD_EOP;
@@ -41,6 +42,7 @@ e1000_tx_init()
 
 struct rx_desc *rx_descs;
 #define N_RXDESC (PGSIZE / sizeof(struct rx_desc))
+char rx_packet_buffer[N_RXDESC][RX_PACKET_SIZE];
 
 int
 e1000_rx_init()
@@ -53,6 +55,9 @@ e1000_rx_init()
 
 	// Initialize all descriptors
 	// You should allocate some pages as receive buffer
+	memset(rx_packet_buffer, '\0', N_RXDESC * RX_PACKET_SIZE);
+	for (int i = 0; i < N_RXDESC; i++) 
+		rx_descs[i].addr = PADDR(rx_packet_buffer[i]);
 
 	// Set hardward registers
 	// Look kern/e1000.h to find useful definations
@@ -97,7 +102,7 @@ e1000_tx(const void *buf, uint32_t len)
 		return -E_AGAIN;
 
 	memset(tx_packet_buffer[tdt], '\0', TX_PACKET_SIZE);
-	memcpy(tx_packet_buffer[tdt], buf, len);
+	memmove(tx_packet_buffer[tdt], buf, len);
 	desc->length = len;
 	desc->status &= ~E1000_TX_STATUS_DD;
 	base->TDT = (base->TDT + 1) % N_TXDESC;
@@ -114,6 +119,17 @@ e1000_rx(void *buf, uint32_t len)
 	// the packet
 	// Do not forget to reset the decscriptor and
 	// give it back to hardware by modifying RDT
+	uint32_t rdt = (base->RDT + 1) % N_TXDESC;
+	struct rx_desc *desc = &rx_descs[rdt];
+	if (!(desc->status & E1000_RX_STATUS_DD)) 
+		return -E_AGAIN;
+
+	if (len < desc->length) 
+		panic("e1000_rx: buf is too small to hold the packet");
+
+	memmove(buf, rx_packet_buffer[rdt], desc->length);
+	desc->status &= ~E1000_RX_STATUS_DD;
+	base->RDT = rdt;
 
 	return 0;
 }
