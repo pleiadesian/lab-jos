@@ -123,7 +123,7 @@ fork(void)
 		return 0;
 	}
 
-	for (addr = 0; addr < UTOP; addr += PGSIZE) {
+	for (addr = USTABDATA; addr < UTOP; addr += PGSIZE) {
 		// User exception stack should not be mapped
 		if (addr == UXSTACKTOP - PGSIZE) 
 			continue;

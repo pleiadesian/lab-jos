@@ -14,6 +14,7 @@
 #include <kern/sched.h>
 #include <kern/cpu.h>
 #include <kern/spinlock.h>
+#include <kern/e1000.h>
 
 struct Env *envs = NULL;		// All environments
 static struct Env *env_free_list;	// Free environment list
@@ -201,6 +202,24 @@ env_setup_vm(struct Env *e)
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
+
+#ifdef ZERO_COPY
+	int r;
+	for (int vaddr = UTXBASE; vaddr < UTXBASE + N_TXDESC * TX_PACKET_SIZE; vaddr += PGSIZE) {
+		    struct PageInfo* p = pa2page(PADDR((void*)((uintptr_t)tx_packet_buffer) + vaddr - UTXBASE));
+			if (p == NULL)
+				panic("env_setup_vm: pa2page failed");
+			if ((r = page_insert(e->env_pgdir, p, (void*)vaddr, PTE_U | PTE_W | PTE_PCD | PTE_PWT)) < 0) 
+				panic("page_insert: %e", r);
+    }
+	for (int vaddr = URXBASE; vaddr < URXBASE + N_RXDESC * RX_PACKET_SIZE; vaddr += PGSIZE) {
+		struct PageInfo* p = pa2page(PADDR((void*)((uintptr_t)rx_packet_buffer) + vaddr - URXBASE));
+		if (p == NULL)
+			panic("env_setup_vm: pa2page failed");
+		if ((r = page_insert(e->env_pgdir, p, (void*)vaddr, PTE_U | PTE_W | PTE_PCD | PTE_PWT)) < 0) 
+			panic("page_insert: %e", r);
+	}
+#endif
 
 	return 0;
 }

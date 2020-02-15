@@ -2,12 +2,13 @@
 #include <kern/pmap.h>
 #include <inc/string.h>
 #include <inc/error.h>
+#include <kern/env.h>
 
 static struct E1000 *base;
 
 struct tx_desc *tx_descs;
-#define N_TXDESC (PGSIZE / sizeof(struct tx_desc))
-char tx_packet_buffer[N_TXDESC][TX_PACKET_SIZE];
+// #define N_TXDESC (PGSIZE / sizeof(struct tx_desc))
+// char tx_packet_buffer[N_TXDESC][TX_PACKET_SIZE];
 
 int
 e1000_tx_init()
@@ -41,8 +42,8 @@ e1000_tx_init()
 }
 
 struct rx_desc *rx_descs;
-#define N_RXDESC (PGSIZE / sizeof(struct rx_desc))
-char rx_packet_buffer[N_RXDESC][RX_PACKET_SIZE];
+// #define N_RXDESC (PGSIZE / sizeof(struct rx_desc))
+// char rx_packet_buffer[N_RXDESC][RX_PACKET_SIZE];
 
 int
 e1000_rx_init()
@@ -101,8 +102,10 @@ e1000_tx(const void *buf, uint32_t len)
 	if (!(desc->status & E1000_TX_STATUS_DD)) 
 		return -E_AGAIN;
 
+#ifndef ZERO_COPY
 	memset(tx_packet_buffer[tdt], '\0', TX_PACKET_SIZE);
 	memmove(tx_packet_buffer[tdt], buf, len);
+#endif
 	desc->length = len;
 	desc->status &= ~E1000_TX_STATUS_DD;
 	base->TDT = (base->TDT + 1) % N_TXDESC;
@@ -127,9 +130,27 @@ e1000_rx(void *buf, uint32_t len)
 	if (len < desc->length) 
 		panic("e1000_rx: buf is too small to hold the packet");
 
+#ifndef ZERO_COPY
 	memmove(buf, rx_packet_buffer[rdt], desc->length);
+#endif
 	desc->status &= ~E1000_RX_STATUS_DD;
 	base->RDT = rdt;
-
+	
 	return desc->length;
 }
+
+#ifdef ZERO_COPY
+int
+get_tdt()
+{
+	if (!(tx_descs[base->TDT].status & E1000_TX_STATUS_DD)) 
+		return -E_AGAIN;
+	return base->TDT;
+}
+
+int
+get_rdt()
+{
+	return base->RDT;
+}
+#endif

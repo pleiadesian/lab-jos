@@ -10,6 +10,7 @@
 #include <kern/env.h>
 #include <kern/cpu.h>
 #include <inc/queue.h>
+#include <kern/e1000.h>
 
 // These variables are set by i386_detect_memory()
 size_t npages;			// Amount of physical memory (in pages)
@@ -227,8 +228,11 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+#ifndef ZERO_COPY
 	boot_map_region_large(kern_pgdir, KERNBASE, (size_t)(0 - KERNBASE), 0, PTE_W);
-	// boot_map_region(kern_pgdir, KERNBASE, (size_t)(0 - KERNBASE), 0, PTE_W);
+#else
+	boot_map_region(kern_pgdir, KERNBASE, (size_t)(0 - KERNBASE), 0, PTE_W);
+#endif
 
 	// Initialize the SMP-related parts of the memory map
 	mem_init_mp();

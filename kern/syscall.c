@@ -490,7 +490,7 @@ sys_map_kernel_page(void* kpage, void* va)
     int r;
     struct PageInfo* p = pa2page(PADDR(kpage));
     if (p == NULL)
-        return E_INVAL;
+        return -E_INVAL;
     r = page_insert(curenv->env_pgdir, p, va, PTE_U | PTE_W);
     return r;
 }
@@ -537,6 +537,10 @@ sys_net_send(const void *buf, uint32_t len)
 		return -E_INVAL;
 	if ((r = user_mem_check(curenv, buf, len, PTE_U)) < 0) 
 		return r;
+	pte_t *pte = pgdir_walk(curenv->env_pgdir, buf, false);
+	if (pte == NULL) 
+		panic("e1000_tx: pgdir_walk failed");
+	cprintf("in syscall: buf=%08x pte=%x\n", (uintptr_t)buf, pte);
 	if ((r = e1000_tx(buf, len)) < 0) 
 		return r;
 	return 0;
@@ -556,6 +560,22 @@ sys_net_recv(void *buf, uint32_t len)
 		return r;
 	return e1000_rx(buf, len);
 }
+
+#ifdef ZERO_COPY
+int
+sys_net_tdt()
+{
+	// get E1000 TDT value
+	return get_tdt();
+}
+
+int
+sys_net_rdt()
+{
+	// get E1000 TDT value
+	return get_rdt();
+}
+#endif
 
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
@@ -647,6 +667,16 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			ret = sys_net_recv((void*)a1, a2);
 			break;
 		}
+#ifdef ZERO_COPY
+		case SYS_net_tdt: {
+			ret = sys_net_tdt();
+			break;
+		}
+		case SYS_net_rdt: {
+			ret = sys_net_rdt();
+			break;
+		}
+#endif
 		default:
 			ret = -E_INVAL;
 	}
