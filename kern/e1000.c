@@ -17,13 +17,6 @@ e1000_tx_init()
 	if (pp == NULL) 
 		panic("e1000_tx_init: out of memory");
 	tx_descs = (struct tx_desc *)mmio_map_region(page2pa(pp), PGSIZE);
-	// tx_descs = page2kva(pp);
-
-	// page_insert(kern_pgdir, pp, tx_descs, PTE_PCD | PTE_PWT | PTE_W);
-	// tx_descs = (struct tx_desc *)KSTACKTOP;
-	// pte_t *pte = pgdir_walk(kern_pgdir, tx_descs, true);
-
-	
 
 	// Initialize all descriptors
 	for (int i = 0; i < N_TXDESC; i++) {
@@ -34,7 +27,6 @@ e1000_tx_init()
 
     // Set hardward registers
 	// Look kern/e1000.h to find useful definations
-	// base->TDBAL = PADDR(tx_descs);
 	base->TDBAL = page2pa(pp);
 	base->TDBAH = 0;
 	base->TDLEN = PGSIZE;
@@ -87,7 +79,7 @@ e1000_tx(const void *buf, uint32_t len)
 	// Hint: buf is a kernel virtual address
 	uint32_t tdt = base->TDT;
 	struct tx_desc *desc = &tx_descs[tdt];
-	if (!desc->status & E1000_TX_STATUS_DD) 
+	if (!(desc->status & E1000_TX_STATUS_DD)) 
 		return -E_AGAIN;
 
 	memset(tx_packet_buffer[tdt], '\0', TX_PACKET_SIZE);

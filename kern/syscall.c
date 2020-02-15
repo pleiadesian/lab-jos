@@ -533,7 +533,7 @@ sys_net_send(const void *buf, uint32_t len)
 	// Call e1000_tx to send the packet
 	// Hint: e1000_tx only accept kernel virtual address
 	int r;
-	if (len <= 0 | len > TX_PACKET_SIZE) 
+	if (len <= 0 || len > TX_PACKET_SIZE) 
 		return -E_INVAL;
 	if ((r = user_mem_check(curenv, buf, len, PTE_U)) < 0) 
 		return r;
