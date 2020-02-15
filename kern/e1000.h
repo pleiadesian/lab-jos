@@ -6,6 +6,8 @@
 #define E1000_VID 0x8086
 #define E1000_DID 0x100e
 
+#define TX_PACKET_SIZE 1518
+
 struct E1000 {
 	volatile uint32_t CTRL;             /* 0x00000  Device Control - RW */
 	volatile uint32_t CTRL_DUP;         /* 0x00004  Device Control Duplicate (Shadow) - RW */

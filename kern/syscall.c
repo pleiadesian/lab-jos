@@ -532,7 +532,14 @@ sys_net_send(const void *buf, uint32_t len)
 	// Check the user permission to [buf, buf + len]
 	// Call e1000_tx to send the packet
 	// Hint: e1000_tx only accept kernel virtual address
-	return -1;
+	int r;
+	if (len <= 0 | len > TX_PACKET_SIZE) 
+		return -E_INVAL;
+	if ((r = user_mem_check(curenv, buf, len, PTE_U)) < 0) 
+		return r;
+	if ((r = e1000_tx(buf, len)) < 0) 
+		return r;
+	return 0;
 }
 
 int
@@ -625,6 +632,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		}
 		case SYS_time_msec: {
 			ret = sys_time_msec();
+			break;
+		}
+		case SYS_net_send: {
+			ret = sys_net_send((void*)a1, a2);
 			break;
 		}
 		default:

@@ -7,7 +7,6 @@ static struct E1000 *base;
 
 struct tx_desc *tx_descs;
 #define N_TXDESC (PGSIZE / sizeof(struct tx_desc))
-#define TX_PACKET_SIZE 1518
 char tx_packet_buffer[N_TXDESC][TX_PACKET_SIZE];
 
 int
