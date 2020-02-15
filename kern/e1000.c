@@ -32,7 +32,7 @@ e1000_tx_init()
 	base->TDLEN = PGSIZE;
 	base->TDH = 0;
 	base->TDT = 0;
-	base->TCTL |= E1000_TCTL_EN | E1000_TCTL_PSP | E1000_TCTL_CT_ETHER |
+	base->TCTL = E1000_TCTL_EN | E1000_TCTL_PSP | E1000_TCTL_CT_ETHER |
 					E1000_TCTL_COLD_FULL_DUPLEX;
 	base->TIPG = E1000_TIPG_DEFAULT;
 
@@ -46,13 +46,27 @@ int
 e1000_rx_init()
 {
 	// Allocate one page for descriptors
+	struct PageInfo *pp = page_alloc(ALLOC_ZERO);
+	if (pp == NULL) 
+		panic("e1000_rx_init: out of memory");
+	rx_descs = (struct rx_desc *)mmio_map_region(page2pa(pp), PGSIZE);
 
 	// Initialize all descriptors
 	// You should allocate some pages as receive buffer
 
 	// Set hardward registers
 	// Look kern/e1000.h to find useful definations
-
+	base->RAL = QEMU_MAC_LOW;
+	base->RAH = QEMU_MAC_HIGH;
+	for (int i = 0; i < 128; i++) 
+		base->MTA[i] = 0;
+	base->RDBAL = page2pa(pp);
+	base->RDBAH = 0;
+	base->RDLEN = PGSIZE;
+	base->RDH = 0;
+	base->RDT = N_RXDESC - 1;
+	base->RCTL = E1000_RCTL_BSIZE_2048 | E1000_RCTL_SECRC;
+	base->RCTL |= E1000_RCTL_EN;
 	return 0;
 }
 
