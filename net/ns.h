@@ -1,7 +1,7 @@
 #include <inc/ns.h>
 #include <inc/lib.h>
 
-#define ZERO_COPY
+// #define ZERO_COPY
 
 #define IP "10.0.2.15"
 #define MASK "255.255.255.0"

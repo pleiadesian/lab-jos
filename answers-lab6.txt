@@ -1,0 +1,79 @@
+## Lab6文档
+
+
+### Question
+
+---
+
+1. How did you structure your transmit implementation? In particular, what do you do if the transmit ring is full?
+
+transmit implementation:
+
+* 设置全局变量`tx_descs`作为descriptor数组，为其分配1个物理页。调用`mmio_map_region`使其映射到MMIO区域，保证cache disabled和write through。
+* 设置全局变量`char tx_packet_buffer[N_TXDESC][TX_PACKET_SIZE]`作为transmit buffer。
+
+* 初始化时将所有descriptor的`addr`设置为对应buffer的物理地址。将E1000的`TDBAL`设置为`tx_descs`的物理页地址。
+
+if the transmit ring is full：
+
+* 根据手册，在descriptor的`cmd`域中设置`RS`位时，可以将`status`域的`DD`位用于表示该descriptor是否正在被使用。因此在初始化时将所有descriptor的`cmd`设置为`E1000_TX_CMD_RS | E1000_TX_CMD_EOP`，将`status`设置为`E1000_TX_STATUS_DD`
+* 在`e1000_tx`中，检查`TDT`处descriptor的`cmd`域的`DD`位。若该位为0，则表示位于TX descriptor tail的descriptor正在被使用，即transimit ring已满。返回`-E_AGAIN`，通知user环境需要重发。
+
+
+
+2. How did you structure your receive implementation? In particular, what do you do if the receive queue is empty and a user environment requests the next incoming packet?
+
+receive implementation:
+
+* 设置全局变量`rx_descs`作为descriptor数组，为其分配1个物理页。调用`mmio_map_region`使其映射到MMIO区域，保证cache disabled和write through。
+* 设置全局变量`char rx_packet_buffer[N_RXDESC][RX_PACKET_SIZE]`作为transmit buffer。
+
+* 初始化时将所有descriptor的`addr`设置为对应buffer的物理地址。将E1000的`RDBAL`设置为`rx_descs`的物理页地址。
+
+if the receive queue is empty:
+
+* 初始化时将descriptor的`status`的`DD`位设置为0
+* `e1000_rx`中，检查`(RDT + 1) % N_RXDESC`处descriptor的`cmd`域的DD位。若该位为0，则表示位于RX descriptor tail的descriptor正在被使用，即receive ring已满。返回`-E_AGAIN`，通知user环境需要重试。
+
+
+
+3. What does the web page served by JOS's web server say?
+
+“This file came from JOS.”
+
+“Cheesy web page! ”
+
+
+
+4. How long approximately did it take you to do this lab?
+
+15小时。
+
+
+### Challenge
+
+---
+
+*Challenge!* Modify your E1000 driver to be "zero copy." Currently, packet data has to be copied from user-space buffers to transmit packet buffers and from receive packet buffers back to user-space buffers. A zero copy driver avoids this by having user space and the E1000 share packet buffer memory directly. There are many different approaches to this, including mapping the kernel-allocated structures into user space or passing user-provided buffers directly to the E1000. Regardless of your approach, be careful how you reuse buffers so that you don't introduce races between user-space code and the E1000.
+
+采用内核buffer和用户态共享的方式：
+
+* 添加两个syscall，`sys_net_tdt`和`sys_net_rdt`，用于获取E1000的`TDT`和`RDT`值
+* 使用0x0 ~ 0x200000的空间，用于将ring buffer映射到用户态。
+  * `kern/env.c`中，将`tx_packet_buffer`和`rx_packet_buffer`的物理页插入到用户页表中，使其映射到0x0 ~ 0x200000对应的空间。权限位设置为`PTE_U | PTE_W | PTE_PCD | PTE_PWT`。
+  * `lib/fork.c`中，fork时页复制的用户空间的起始地址从`0`改为`USTABDATA`，防止ring buffer的空间被重新映射，导致权限位错误。
+* `kern/e1000.h`中，删去发包和收包时的`memset`和`memmove`调用。
+* 为了使得用户态和内核态的结构体对齐，在`kern/e1000.h`中声明全局变量时，`tx_packet_buffer`和`rx_packet_buffer`的声明后面添加`__attribute__((aligned(PGSIZE)))`保留字，使其以页大小对齐。
+* 为了使得内核结构体能映射到用户态，不再使用大页。将`kern/pmap.c`中的`boot_map_region_large`调用都改为`boot_map_region`调用。
+
+用户程序使用“zero copy”：
+
+* 去掉`kern/e1000.h`和`net/ns.h`中`#define ZERO_COPY`的注释
+
+* 如果用户程序想使用“zero copy”提高发包性能，则需要先通过调用`sys_net_tdt`获取`TDT`，使用`UTXBASE + TDT * TX_PACKET_SIZE`开始的`TX_PACKET_SIZE`大小的空间进行内存操作。当发包的内容已经放到该空间中，再调用`sys_net_send`进行发包。如`net/output.c`所示。
+* 如果用户程序想使用“zero copy”提高收包性能。当调用`sys_net_recv`收包成功后，通过调用`sys_net_rdt`获取`RDT`。此时`URXBASE + RDT * RX_PACKET_SIZE`开始的`RX_PACKET_SIZE`大小的空间为收到包的内容。直接在这段空间进行内存操作。如`net/input.c`所示。
+
+可以继续优化的部分：
+
+* 在使用output环境和input环境时，用户态中的从ipc buffer到ring buffer的1次`memcpy`无法避免。如果需要用“zero copy”提升性能，则应该让用户程序直接操作ring buffer。
+* 若有并发用户环境，则存在ring buffer操作的race condition。可能的方案是留出一段shared memory，实现对ring buffer的spinlock；或者添加对ring buffer加锁和放锁的syscall。

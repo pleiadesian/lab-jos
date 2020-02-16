@@ -3,7 +3,7 @@
 
 #include <kern/pci.h>
 
-#define ZERO_COPY
+// #define ZERO_COPY
 
 #define E1000_VID 0x8086
 #define E1000_DID 0x100e
