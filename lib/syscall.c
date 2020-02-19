@@ -19,7 +19,6 @@ syscall(int num, int check, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 	// The last clause tells the assembler that this can
 	// potentially change the condition codes and arbitrary
 	// memory locations.
-
 	asm volatile("int %1\n"
 		     : "=a" (ret)
 		     : "i" (T_SYSCALL),
@@ -145,4 +144,16 @@ int
 sys_net_recv(void *buf, uint32_t len)
 {
 	return (unsigned int) syscall(SYS_net_recv, 0, (uint32_t) buf, len, 0, 0, 0);
+}
+
+int
+sys_net_tdt()
+{
+	return (unsigned int) syscall(SYS_net_tdt, 0, 0, 0, 0, 0, 0);
+}
+
+int
+sys_net_rdt()
+{
+	return (unsigned int) syscall(SYS_net_rdt, 0, 0, 0, 0, 0, 0);
 }

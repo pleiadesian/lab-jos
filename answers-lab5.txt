@@ -1,0 +1,54 @@
+## Lab5文档
+
+
+
+### Question
+
+---
+
+1. Do you have to do anything else to ensure that this I/O privilege setting is saved and restored properly when you subsequently switch from one environment to another? Why?
+
+没有在保存和恢复时对I/O特权做额外的设置。确定I/O特权的IOPL位在eflags中，会在环境挂起时保存到`Env`结构体的`env_tf`成员变量中，在环境重新调度时恢复。
+
+
+
+### Challenge
+
+---
+
+*Challenge!* The block cache has no eviction policy. Once a block gets faulted in to it, it never gets removed and will remain in memory forevermore. Add eviction to the buffer cache. Using the `PTE_A` "accessed" bits in the page tables, which the hardware sets on any access to a page, you can track approximate usage of disk blocks without the need to modify every place in the code that accesses the disk map region. Be careful with dirty blocks.
+
+采用时钟算法。设计如下：
+
+* 维护大小为`BCSIZE`的block cache，存储已缓存的页地址。定义在`fs/fs.h`中。
+* 维护时钟指针`clock_pointer`和还未被填充的cache位置`not_cold_cache`。定义在`fs/bc.c`中
+* super block不被算入该淘汰算法。
+* 当block cache未被填充满时，按照原方法先分配页，再读磁盘内容，并设置页的相应PTE位。
+* 当block cache被填充满时，采用时钟算法寻找淘汰页。将access bit为1的页的access bit置0，并使`clock_pointer`自增，指向cache中下一个页。每一次遇到dirty bit为1的页，则flush并将dirty bit置0。当第一次遇到access bit为0的页，选中该页为淘汰页。
+* 检查淘汰页的dirty bit，若为1，则flush并将dirty bit置0。调用`sys_page_map()`将淘汰页所对应的物理页映射给需要分配的页，并调用`sys_page_unmap()`将淘汰页从其页表中删除。设置页相应PTE位。
+
+测试时钟算法：
+
+* 将`fs/bc.c`的`#define EVICT_POLICY`注释去掉
+* 执行`make run-testfile`，可看到如下结果
+
+```
+...
+put page 1013f000 into block cache 4
+put page 10140000 into block cache 5
+put page 10141000 into block cache 6
+put page 10142000 into block cache 7
+reset page 1013b000's access bit
+reset page 1013c000's access bit
+reset page 10003000's access bit
+reset page 1013e000's access bit
+reset page 1013f000's access bit
+reset page 10140000's access bit
+reset page 10141000's access bit
+reset page 10142000's access bit
+evict page 1013b000 from block cache 0
+...
+```
+
+
+

@@ -3,6 +3,7 @@
 
 #define SECTSIZE	512			// bytes per disk sector
 #define BLKSECTS	(BLKSIZE / SECTSIZE)	// sectors per block
+#define BCSIZE      8           // block cache size
 
 /* Disk block n, when in memory, is mapped into the file system
  * server's address space at DISKMAP + (n*BLKSIZE). */
@@ -13,6 +14,7 @@
 
 struct Super *super;		// superblock
 uint32_t *bitmap;		// bitmap blocks mapped in memory
+void *block_cache[BCSIZE];  // block cache
 
 /* ide.c */
 bool	ide_probe_disk1(void);

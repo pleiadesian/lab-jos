@@ -1,0 +1,202 @@
+## lab2 文档
+
+
+
+### lab设计
+
+---
+
+**Exercise 1.** In the file `kern/pmap.c`, you must implement code for the following functions (probably in the order given).
+
+```
+boot_alloc()
+mem_init() (only up to the call to `check_page_free_list(1)`)
+page_init()
+page_alloc()
+page_free()
+```
+
+##### boot_alloc()
+
+如果n等于0，直接返回next_free，作为当前空闲页的位置。n不为0时，返回当前的next_free，并且将next_free增加`ROUNDUP(n, PGSIZE)`，即可以容纳下n个字节的页的大小。检查此时next_free的虚拟地址没有溢出，且next_free的物理地址不大于实际物理内存的大小，否则调用panic。
+
+##### mem_init()
+
+需要完成的部分是PageInfo的空间分配。调用boot_alloc为PageInfo结构体数组分配npages个PageInfo的空间。然后调用memset将PageInfo结构体数组初始化为0。
+
+##### page_init()
+
+* 将第一个物理内存页标为使用中
+* 将第二个物理内存页开始，直到base memory结束的物理内存页标为空闲
+* 将base memory开始，直到extended memory结束的物理内存页标为使用中
+* 将extended memory开始，直到第一个空闲页的物理地址的物理内存页标为使用中
+  * 此处第一个空闲页的物理地址通过`boot_alloc(0)`得到
+* 将第一个空闲页开始的剩余物理内存的页标为空闲
+
+##### page_alloc()
+
+若空闲链表为NULL，则返回NULL，表示当前所有物理内存已经分配完毕。若空闲链表不为NULL，返回链表头处的PageInfo作为分配的页，将空闲链表的头指针移动到链表头的pp_link所指向的PageInfo。若flag的ALLOC_ZERO位为1，则调用`page2kva(alloc_page)`获得被分配的PageInfo所对应的虚拟地址，调用memset将该页的每一个字节初始化为'\0'。
+
+##### page_free()
+
+若传入的PageInfo的pp_ref不为0，或者pp_link不为NULL，则调用panic。使用头插法将传入的PageInfo加入空闲链表中。
+
+
+
+**Exercise 4.** In the file `kern/pmap.c`, you must implement code for the following functions.
+
+```c
+pgdir_walk()
+boot_map_region()
+boot_map_region_large() //  Map all phy-mem at KERNBASE as large pages
+page_lookup()
+page_remove()
+page_insert()
+```
+
+##### pgdir_walk()
+
+先取出pgdir上对应于虚拟地址PDX的页表项。若页表项的PTE_P为0，则在create为false的时候返回NULL，在create为true的时候分配新页表、更新页表项为新页表物理地址并返回新页表中对应于虚拟地址PTX的页表项的指针。若页表项的PTE_P为1，则取出页表的物理地址，并找到页表上对应于虚拟地址PTX的页表项的指针。若页表项的PTE_P为1，且PTE_PS为1，说明当前虚拟被映射到1个大页上，直接返回pgdir上对应于虚拟地址PDX的页表项的指针。
+
+##### boot_map_region()
+
+在[va, va+size)的范围内对每一个页进行`pgdir_walk()`获得页表项，若页表项不存在或者页表项的PTE_P位为1，则调用panic。将物理地址、权限位、PTE_P写到页表项中
+
+##### boot_map_region_large()
+
+与`boot_map_region()`的实现类似。由于要映射到大页，直接使用虚拟地址PDX在pgdir上所对应的页表项作为当前虚拟地址的页表项。
+
+##### page_lookup()
+
+先调用`pgdir_walk()`获得页表项，检查页表项不为NULL且页表项PTE_P为1。需要时将pte指针存到pte_store中。通过调用`pa2page()`返回页表项中物理地址所对应的PageInfo。
+
+##### page_remove()
+
+调用`page_lookup()`，若页不存在，则无需删除该页，直接返回。若页存在，调用`page_decref()`，使得页的pp_ref自减1，若pp_ref等于0，则调用`page_free()`，将该页放入freelist。将虚拟地址对应的TLB invalidate。
+
+
+
+**Exercise 5.** Fill in the missing code in `mem_init()` after the call to `check_page()`.
+
+##### PageInfo结构体的映射
+
+调用`boot_map_region()`将虚拟地址中`UPAGE`开始的一段PTSIZE空间映射到pages指针所对应的物理地址。权限位为`PTE_U`。
+
+##### 内核栈的映射
+
+调用`boot_map_region()`将虚拟地址中`KSTACKTOP - KSTKSIZE`开始的一段KSTKSIZE空间映射到bootstack所对应的物理地址，权限位为`PTE_W`。
+
+##### KERNBASE以上的虚拟地址的映射
+
+调用`boot_map_region_large()`，分配大页给KERNBASE以上的虚拟地址。将KERNBASE开始的虚拟地址映射到从0开始的物理地址，权限位为`PTE_W`。
+
+##### page size extension的开启
+
+在entry.S中，将`%cr4`的PSE位置1。
+
+
+
+### Question
+
+---
+
+**Question1** Assuming that the following JOS kernel code is correct, what type should
+
+variable`x`have,`uintptr_t`or`physaddr_t`?
+
+```c
+mystery_t x;
+char* value = return_a_pointer();
+*value = 10;
+x = (mystery_t) value;
+```
+
+x的类型是uintptr_t。因为C语言里的指针是通过虚拟地址寻址的，因此value是虚拟地址，因此x也应是虚拟地址。
+
+
+
+**Question 2** What entries (rows) in the page directory have been filled in at this point? What addresses do they map and where do they point? In other words, fill out this table as much as possible:
+
+| Entry | Base Virtual Address  | Points to (logically):                |
+| ----- | --------------------- | ------------------------------------- |
+| 1023  | 0xffc00000            | Page table for top 4MB of phys memory |
+| ...   | 虚拟地址上4MB大小的页 | 物理地址顶部往下第二个4MB大小的页     |
+| 960   | 0xf0000000            | 物理地址0处的4MB大小的页              |
+| 959   | 0xefc00000            | 内核栈的页表                          |
+| 958   | .                     | 没有映射                              |
+| 957   | 0xef400000            | 页目录                                |
+| 956   | 0xef000000            |                                       |
+| ...   | .                     | 没有映射                              |
+| 0     | 0x00000000            | [see next question]                   |
+
+
+
+**Question 3** (From Lecture 3) We have placed the kernel and user environment in the same address space. Why will user programs not be able to read or write the kernel's memory? What specific mechanisms protect the kernel memory?
+
+防止user读写所有物理内存，保证隔离性。页表的权限位保护内核内存，PTE_U位为0的页表项阻止user访问对应内存。
+
+
+
+**Question 4** What is the maximum amount of physical memory that this operating system can support? Why?
+
+最大能支持256MB的物理内存。因为只有0xf0000000(KERNBASE)以上的内核虚拟空间被映射到对应物理内存，且可以读写对应的物理内存。
+
+
+
+**Question 5** How much space overhead is there for managing memory, if we actually had the maximum amount of physical memory? How is this overhead broken down?
+
+一共有12MB的管理内存的开销：
+
+* pages结构体占了PTSIZE=4MB
+* 指向页目录的虚拟地址占了PTSIZE=4MB
+* 页表占了1024*4K=4MB
+
+减少开销的方法：使用多层页表。例如将32位地址的高5位作为第一层页目录的index，接着5位作为第二层页目录的index，接着5位作为第三层页目录的index，接着5位作为第四层页表的index。第四层页表有256MB/4K/1024=64个，第三层页目录到第一层页目录都只需要1个。页表的开销被减少到了256K
+
+
+
+**Question 6** Revisit the page table setup in `kern/entry.S` and `kern/entrypgdir.c`. Immediately after we turn on paging, EIP is still a low number (a little over 1MB). At what point do we transition to running at an EIP above KERNBASE? What makes it possible for us to continue executing at a low EIP between when we enable paging and when we begin running at an EIP above KERNBASE? Why is this transition necessary?
+
+```assembly
+	mov	$relocated, %eax
+	jmp	*%eax
+relocated:
+```
+
+在jmp到relocated标签后，EIP大于KERNBASE。
+
+entry_pgdir中，有[KERNBASE, KERNBASE+4MB) 到[0, 4MB)、[0, 4MB) 到 [0, 4MB)的映射。因此在低地址时也能正确映射到对应物理地址。
+
+虚拟空间布局要求留低地址户，因此内核的内存空间需要在高地址。
+
+
+
+### Challenge
+
+---
+
+*Challenge!* We consumed many physical pages to hold the page tables for the KERNBASE mapping. Do a more space-efficient job using the PTE_PS ("Page Size") bit in the page directory entries. This bit was *not* supported in the original 80386, but is supported on more recent x86 processors. You will therefore have to refer to [Volume 3 of the current Intel manuals](https://ipads.se.sjtu.edu.cn/courses/readings/ia32/IA32-3A.pdf). Make sure you design the kernel to use this optimization only on processors that support it!
+
+##### KERNBASE以上的虚拟地址的映射
+
+调用`boot_map_region_large()`，分配大页给KERNBASE以上的虚拟地址。将KERNBASE开始的虚拟地址映射到从0开始的物理地址，权限位为`PTE_W`。
+
+##### page size extension的开启
+
+在entry.S中，将`%cr4`的PSE位置1。
+
+
+
+*Challenge!* Extend the JOS kernel monitor with commands to:
+
+- Display in a useful and easy-to-read format all of the physical page mappings (or lack thereof) that apply to a particular range of virtual/linear addresses in the currently active address space. For example, you might enter `'showmappings 0x3000 0x5000'` to display the physical page mappings and corresponding permission bits that apply to the pages at virtual addresses 0x3000, 0x4000, and 0x5000.
+
+对用户输入的开始地址和结束地址向下取整。从开始地址开始，先通过`pgdir_walk()`读取4KB大小的页的页表项，打印到控制台。若检查到当前地址大于KERNBASE，则跳出循环，开始在`kern_pgdir`上读取4MB大小的页的页表项，打印到控制台。
+
+- Explicitly set, clear, or change the permissions of any mapping in the current address space.
+
+判断用户输入的虚拟地址是否大于KERNBASE，是大页则直接在`kern_pgdir`上取出PTE，否则通过`pgdir_walk()`取出PTE。直接将用户输入的物理地址和权限位写到PTE上。
+
+- Dump the contents of a range of memory given either a virtual or physical address range. Be sure the dump code behaves correctly when the range extends across page boundaries!
+
+对于每一个虚拟地址，打印出其地址上的32位的内容。如果输入的是物理地址，则调用`KADDR()`获得虚拟地址，再打印出内容。

@@ -3,8 +3,13 @@
 
 #include <kern/pci.h>
 
+// #define ZERO_COPY
+
 #define E1000_VID 0x8086
 #define E1000_DID 0x100e
+
+#define TX_PACKET_SIZE 1518
+#define RX_PACKET_SIZE 2048
 
 struct E1000 {
 	volatile uint32_t CTRL;             /* 0x00000  Device Control - RW */
@@ -64,7 +69,7 @@ struct tx_desc {
 };
 
 #define E1000_TX_CMD_EOP (1U)
-#define E1000_TX_CMD_RS (4U)
+#define E1000_TX_CMD_RS (8U)
 #define E1000_TX_STATUS_DD (1U)
 
 struct rx_desc {
@@ -78,9 +83,20 @@ struct rx_desc {
 
 #define E1000_RX_STATUS_DD (1U)
 
+#define PGSIZE 4096
+#define N_TXDESC (PGSIZE / sizeof(struct tx_desc))
+#define N_RXDESC (PGSIZE / sizeof(struct rx_desc))
+
+char tx_packet_buffer[N_TXDESC][TX_PACKET_SIZE] __attribute__((aligned(PGSIZE)));
+char rx_packet_buffer[N_RXDESC][RX_PACKET_SIZE] __attribute__((aligned(PGSIZE)));
+
 int pci_e1000_attach(struct pci_func *pcif);
 int e1000_tx_init();
 int e1000_tx(const void *buf, uint32_t len);
 int e1000_rx(void *buf, uint32_t len);
+#ifdef ZERO_COPY
+int get_tdt();
+int get_rdt();
+#endif
 
 #endif  // SOL >= 6

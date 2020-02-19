@@ -64,10 +64,18 @@ start32:
 	# we are still running at a low EIP.
 	movl    $(RELOC(entry_pgdir)), %eax
 	movl    %eax, %cr3
+	# Turn on huge page
+	movl    %cr4, %eax
+	orl     $(CR4_PSE), %eax
+	movl    %eax, %cr4
 	# Turn on paging.
 	movl    %cr0, %eax
 	orl     $(CR0_PE|CR0_PG|CR0_WP), %eax
 	movl    %eax, %cr0
+	# Turn on page size extension.
+	movl	%cr4, %eax
+	orl 	$(CR4_PSE), %eax
+	movl	%eax, %cr4
 
 	# Switch to the per-cpu stack allocated in boot_aps()
 	movl    mpentry_kstack, %esp

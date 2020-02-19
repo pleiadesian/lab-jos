@@ -138,6 +138,10 @@
 // The location of the user-level STABS data structure
 #define USTABDATA	(PTSIZE / 2)
 
+// Used for packet buffers in zero copy implementation
+#define UTXBASE		0
+#define URXBASE		0X100000
+
 // Physical address of startup code for non-boot CPUs (APs)
 #define MPENTRY_PADDR	0x7000
 

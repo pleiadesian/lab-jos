@@ -1,0 +1,53 @@
+### Question
+
+---
+
+1. Compare `kern/mpentry.S` side by side with `boot/boot.S`. Bearing in mind that `kern/mpentry.S` is compiled and linked to run above `KERNBASE` just like everything else in the kernel, what is the purpose of macro `MPBOOTPHYS`? Why is it necessary in `kern/mpentry.S` but not in `boot/boot.S`? In other words, what could go wrong if it were omitted in `kern/mpentry.S`?
+
+`MPBOOTPHYS(va)`用于计算va所映射到的物理地址。linker将所有地址链接到高地址的link address。此时AP运行在实模式下，没有开启paging，通过段寄存器和offset寻址，高地址link address没有被GDT或者页表映射到正确的load address。因此需要通过宏来计算出load address填入指令中。如果不在AP的实模式下使用`MPBOOTPHYS`计算出实际的地址，而是直接引用link address，就会导致寻址出错。
+
+
+
+2. It seems that using the big kernel lock guarantees that only one CPU can run the kernel code at a time. Why do we still need separate kernel stacks for each CPU? Describe a scenario in which using a shared kernel stack will go wrong, even with the protection of the big kernel lock.
+
+user态发生trap，到`trap()`上锁之前，硬件和`trapentry.S`的指令会将trapframe从内核栈栈顶开始压栈。`trap()`中执行到`lock_kernel()`之前也会有一段没有上锁的对内核栈的操作。如果不使用分离的内核栈，有可能CPU0发生trap，在内核栈顶压入trapframe；CPU0对kernel上锁前，CPU1发生trap，将CPU0的trapframe覆盖，导致CPU0之后读取到了错误的trapframe。
+
+
+
+3. In your implementation of `env_run()` you should have called `lcr3()`. Before and after the call to `lcr3()`, your code makes references (at least it should) to the variable `e`, the argument to `env_run`. Upon loading the `%cr3` register, the addressing context used by the MMU is instantly changed. But a virtual address (namely `e`) has meaning relative to a given address context--the address context specifies the physical address to which the virtual address maps. Why can the pointer `e` be dereferenced both before and after the addressing switch?
+
+e是envs数组的一个元素。envs数组位于所有环境`RO ENVS`的虚拟地址里。`RO ENVS`到实际envs数组的物理地址在`mem_init()`中已经建立。因此不同的页表里都有从`RO ENVS`到ens数组物理地址的映射。
+
+
+
+4. Whenever the kernel switches from one environment to another, it must ensure the old environment's registers are saved so they can be restored properly later. Why? Where does this happen?
+
+每个环境的变量、PC、ESP等状态都被存储在寄存器当中，如果上下文切换时不保存这些状态，则下次调度到该环境时，会丢失这些状态。保存在trap入口处完成，每个环境的状态保存到该环境的`Trapframe`结构体中；环境被调度时，在`env_pop_tf()`中恢复各个寄存器值。
+
+
+
+### Challenge
+
+---
+
+*Challenge!* Why does `ipc_send` have to loop? Change the system call interface so it doesn't have to. Make sure you can handle multiple environments trying to send to one environment at the same time.
+
+`ipc_send`的循环是为了保证每一个参数正确的send都能被一个对应的环境接收到，避免了环境接收晚于发送或者已有其他发送者发送消息，导致消息丢失的情况。
+
+用类似于唤醒接收者的方式优化IPC发送，代替原有的polling。
+
+首先在Env结构体中加入以下成员变量，用于记录发送者的参数和发送的状态。其中`env_ipc_sending`表示该环境是否在等待发送一条消息。
+
+```c
+	bool env_ipc_sending;
+	envid_t env_ipc_send_envid;
+	uint32_t env_ipc_send_value;
+	void *env_ipc_srcva;
+	int env_ipc_send_perm;
+```
+
+在`sys_ipc_try_send`系统调用中，若检查到接收者的`env_ipc_recving`为0，则将参数存入curenv的以上成员变量中，并将`env_ipc_sending`置1。调用`sched_yield()`让出CPU资源。
+
+在`sys_ipc_recv`系统调用中，首先遍历envs数组，若检查到`env_ipc_sending`为1，且`env_ipc_send_envid`为curenv的id的环境时，判断其为发送者。检查其参数，若参数不合法，将对应发送者的`envs[i].env_tf.tf_regs.reg_eax`置为`-E_INVAL`并将其状态置为RUNNABLE，使其被调度到时`ipc_send`的返回值为`-E_INVAL`。若参数合法，则使用其参数作为当前接收者所接收到的消息，唤醒发送者并返回。
+
+在`env_alloc()`当中，需要将`e->env_ipc_sending`置0。
