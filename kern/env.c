@@ -196,9 +196,9 @@ env_setup_vm(struct Env *e)
 	e->env_pgdir = page2kva(p);
 
 	// The VA space of all envs is identical above UTOP
-	for (uintptr_t i = UTOP; i >= UTOP; i += PTSIZE) {
-		e->env_pgdir[PDX(i)] = kern_pgdir[PDX(i)];
-	}
+	// for (uintptr_t i = UTOP; i >= UTOP; i += PTSIZE) {
+	// 	e->env_pgdir[PDX(i)] = kern_pgdir[PDX(i)];
+	// }
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -207,7 +207,7 @@ env_setup_vm(struct Env *e)
 	// LAB 7: Your code here.
 	// Allocate another page to hold kernel page table
 
-	
+
 #ifdef ZERO_COPY
 	int r;
 	for (int vaddr = UTXBASE; vaddr < UTXBASE + N_TXDESC * TX_PACKET_SIZE; vaddr += PGSIZE) {
