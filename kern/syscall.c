@@ -225,6 +225,12 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 		page_free(pp);
 		return r;
 	}
+
+	if ((r = page_insert(env->env_kern_pgdir, pp, va, perm)) < 0) {
+		page_remove(env->env_pgdir, va);
+		page_free(pp);
+		return r;
+	}
 		
 	return 0;
 }
@@ -285,6 +291,12 @@ sys_page_map(envid_t srcenvid, void *srcva,
 		return r;
 	}
 
+	if ((r = page_insert(dstenv->env_kern_pgdir, srcpp, dstva, perm)) < 0) {
+		page_remove(dstenv->env_pgdir, dstva);
+		page_free(srcpp);
+		return r;
+	}
+
 	return 0;
 }
 
@@ -311,6 +323,7 @@ sys_page_unmap(envid_t envid, void *va)
 		return -E_INVAL;
 
 	page_remove(env->env_pgdir, va);
+	page_remove(env->env_kern_pgdir, va);
 	return 0;
 }
 
@@ -389,6 +402,10 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 			return -E_INVAL;		
 		if ((r = page_insert(env->env_pgdir, pp, env->env_ipc_dstva, perm)) < 0) 
 			return r;
+		if ((r = page_insert(env->env_kern_pgdir, pp, env->env_ipc_dstva, perm)) < 0) {
+			page_remove(env->env_pgdir, env->env_ipc_dstva);
+			return r;
+		}
 		env->env_ipc_perm = perm;
 	} else{
 		env->env_ipc_perm = 0;
@@ -464,6 +481,13 @@ sys_ipc_recv(void *dstva)
 					envs[i].env_status = ENV_RUNNABLE;
 					continue;
 				}
+				if ((r = page_insert(curenv->env_kern_pgdir, pp, dstva, perm)) < 0) {
+					page_remove(curenv->env_pgdir, dstva);
+					envs[i].env_tf.tf_regs.reg_eax = r;
+					envs[i].env_ipc_sending = 0;
+					envs[i].env_status = ENV_RUNNABLE;
+					continue;
+				}
 				curenv->env_ipc_perm = perm;
 			} else {
 				curenv->env_ipc_perm = 0;
@@ -492,6 +516,7 @@ sys_map_kernel_page(void* kpage, void* va)
     if (p == NULL)
         return -E_INVAL;
     r = page_insert(curenv->env_pgdir, p, va, PTE_U | PTE_W);
+	r = page_insert(curenv->env_kern_pgdir, p, va, PTE_U | PTE_W);
     return r;
 }
 
@@ -509,6 +534,8 @@ sys_sbrk(uint32_t inc)
 		if (page == NULL) 
 			panic("sys_sbrk: page_alloc failed");
 		if ((r = page_insert(curenv->env_pgdir, page, (void *)i, PTE_W | PTE_U)) < 0) 
+			panic("sys_sbrk: %e", r); 
+		if ((r = page_insert(curenv->env_kern_pgdir, page, (void *)i, PTE_W | PTE_U)) < 0) 
 			panic("sys_sbrk: %e", r); 
 	}
 
@@ -540,7 +567,6 @@ sys_net_send(const void *buf, uint32_t len)
 	pte_t *pte = pgdir_walk(curenv->env_pgdir, buf, false);
 	if (pte == NULL) 
 		panic("e1000_tx: pgdir_walk failed");
-	cprintf("in syscall: buf=%08x pte=%x\n", (uintptr_t)buf, pte);
 	if ((r = e1000_tx(buf, len)) < 0) 
 		return r;
 	return 0;

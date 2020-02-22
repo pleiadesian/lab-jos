@@ -11,7 +11,7 @@
 #include <kern/pmap.h>
 #include <kern/kpti.h>
 
-struct CpuInfo cpus[NCPU];
+struct CpuInfo cpus[NCPU] __user_mapped_data;
 struct CpuInfo *bootcpu;
 int ismp;
 int ncpu;

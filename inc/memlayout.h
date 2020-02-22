@@ -189,7 +189,7 @@ struct PageInfo {
 	// boot_alloc do not have valid reference count fields.
 
 	uint16_t pp_ref;
-};
+}  __user_mapped_data;
 
 #endif /* !__ASSEMBLER__ */
 #endif /* !JOS_INC_MEMLAYOUT_H */

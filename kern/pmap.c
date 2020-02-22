@@ -229,11 +229,11 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
-#ifndef ZERO_COPY
-	boot_map_region_large(kern_pgdir, KERNBASE, (size_t)(0 - KERNBASE), 0, PTE_W);
-#else
+// #ifndef ZERO_COPY
+// 	boot_map_region_large(kern_pgdir, KERNBASE, (size_t)(0 - KERNBASE), 0, PTE_W);
+// #else
 	boot_map_region(kern_pgdir, KERNBASE, (size_t)(0 - KERNBASE), 0, PTE_W);
-#endif
+// #endif
 
 	// Initialize the SMP-related parts of the memory map
 	mem_init_mp();
@@ -649,7 +649,7 @@ void
 tlb_invalidate(pde_t *pgdir, void *va)
 {
 	// Flush the entry only if we're modifying the current address space.
-	if (!curenv || curenv->env_pgdir == pgdir)
+	if (!curenv || curenv->env_pgdir == pgdir || curenv->env_kern_pgdir == pgdir)
 		invlpg(va);
 }
 

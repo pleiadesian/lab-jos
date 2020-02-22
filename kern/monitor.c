@@ -129,7 +129,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 		// get return address and 5 arguments from 8 bytes offset
 		for (int i = 0 ; i < 5 ; i++) {
 			// check
-			pte_t *pte = pgdir_walk(curenv->env_pgdir, ebp + 2 + i, false);
+			pte_t *pte = pgdir_walk(curenv->env_kern_pgdir, ebp + 2 + i, false);
 			if (pte == NULL || !((*pte) & PTE_P)) 
 				break;
 			args[i] = *(ebp + 2 + i);

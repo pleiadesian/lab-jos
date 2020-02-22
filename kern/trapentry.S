@@ -42,7 +42,8 @@
 	pushl $(num);							\
 	jmp _alltraps
 
-.text
+# .text
+.section .user_mapped.text
 
 /*
  * Lab 3: Your code here for generating entry points for the different traps.
@@ -134,4 +135,4 @@ _alltraps:
 	movw	%ax, %ds
 	movw	%ax, %es
 	pushl	%esp
-	call	trap
+	call	switch_and_trap

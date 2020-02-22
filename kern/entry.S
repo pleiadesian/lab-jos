@@ -92,7 +92,8 @@ relocated:
 spin:	jmp	spin
 
 
-.data
+# .data
+.section .user_mapped.data
 ###################################################################
 # boot stack
 ###################################################################
@@ -102,4 +103,5 @@ bootstack:
 	.space		KSTKSIZE
 	.globl		bootstacktop   
 bootstacktop:
+.data
 

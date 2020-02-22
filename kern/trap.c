@@ -27,7 +27,7 @@ static struct Trapframe *last_tf;
 /* Interrupt descriptor table.  (Must be built at run time because
  * shifted function addresses can't be represented in relocation records.)
  */
-struct Gatedesc idt[256] = { { 0 } };
+struct Gatedesc idt[256] __user_mapped_data = { { 0 } };
 struct Pseudodesc idt_pd = {
 	sizeof(idt) - 1, (uint32_t) idt
 };
@@ -462,8 +462,16 @@ switch_and_trap(struct Trapframe *frame)
 	if ((frame->tf_cs & 3) == 3) {
 		// Calculate the current CPU core number
 		int cpunum = -1;
+		uint32_t esp = read_esp();
+		for (cpunum = 0; cpunum < NCPU; cpunum++) {
+			uintptr_t kstacktop_i = KSTACKTOP - cpunum * (KSTKSIZE + KSTKGAP);
+			if (esp >= kstacktop_i - KSTKSIZE && esp <= kstacktop_i) 
+				break;
+    	}
+
 		// Load the physical address of kernel page table
 		// Switch to the kernel page table
+		lcr3(PADDR(cpus[cpunum].cpu_env->env_kern_pgdir));
 	}
 	trap(frame);
 }

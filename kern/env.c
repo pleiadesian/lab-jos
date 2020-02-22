@@ -17,7 +17,7 @@
 #include <kern/kpti.h>
 #include <kern/e1000.h>
 
-struct Env *envs = NULL;		// All environments
+struct Env *envs __user_mapped_data = NULL;		// All environments
 static struct Env *env_free_list;	// Free environment list
 					// (linked by Env->env_link)
 
@@ -38,7 +38,7 @@ static struct Env *env_free_list;	// Free environment list
 // definition of gdt specifies the Descriptor Privilege Level (DPL)
 // of that descriptor: 0 for kernel and 3 for user.
 //
-struct Segdesc gdt[NCPU + 5] =
+struct Segdesc gdt[NCPU + 5] __user_mapped_data =
 {
 	// 0x0 - unused (always faults -- for trapping NULL far pointers)
 	SEG_NULL,
@@ -200,12 +200,51 @@ env_setup_vm(struct Env *e)
 	// 	e->env_pgdir[PDX(i)] = kern_pgdir[PDX(i)];
 	// }
 
-	// UVPT maps the env's own page table read-only.
+	for (uintptr_t i = UTOP; i < ULIM; i += PTSIZE) {
+		e->env_pgdir[PDX(i)] = kern_pgdir[PDX(i)];
+	}
+
+	for (uintptr_t i = MMIOLIM; i < KSTACKTOP; i += PTSIZE) {
+		e->env_pgdir[PDX(i)] = kern_pgdir[PDX(i)];
+	}
+
+	// Necessary mappings
+	uintptr_t user_map_begin_page = ROUNDDOWN((uintptr_t)__USER_MAP_BEGIN__, PGSIZE);
+	uintptr_t user_map_end_page = ROUNDUP((uintptr_t)__USER_MAP_END__, PGSIZE);
+	// cprintf("user_map region: %08x %08x\n", user_map_begin_page, user_map_end_page);
+	for (uintptr_t i = user_map_begin_page; i < user_map_end_page; i += PGSIZE) {
+		pte_t *user_pte = pgdir_walk(e->env_pgdir, (void *)i, true);
+		pte_t *kern_pte = pgdir_walk(kern_pgdir, (void *)i, false);
+		*user_pte = *kern_pte;
+	}
+	uintptr_t envs_map_begin_page = ROUNDDOWN((uintptr_t)envs, PGSIZE);
+	uintptr_t envs_map_end_page = ROUNDUP(((uintptr_t)envs) + NENV * sizeof(struct Env), PGSIZE);
+	for (uintptr_t i = envs_map_begin_page; i < envs_map_end_page; i += PGSIZE) {
+		pte_t *user_pte = pgdir_walk(e->env_pgdir, (void *)i, true);
+		pte_t *kern_pte = pgdir_walk(kern_pgdir, (void *)i, false);
+		*user_pte = *kern_pte;
+	}
+
+    // UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pgdir[PDX(UVPT)] = PADDR(e->env_pgdir) | PTE_P | PTE_U;
 
 	// LAB 7: Your code here.
 	// Allocate another page to hold kernel page table
+	struct PageInfo *kp = NULL;
+	if (!(kp = page_alloc(ALLOC_ZERO))) 
+		return -E_NO_MEM;
+
+	kp->pp_ref += 1;
+	e->env_kern_pgdir = page2kva(kp);
+	// hold user page table
+	for (uintptr_t i = 0; i < ULIM; i += PTSIZE) {
+		e->env_kern_pgdir[PDX(i)] = e->env_pgdir[PDX(i)];
+	}
+	// hold kernel page table
+	for (uintptr_t i = ULIM; i >= ULIM; i += PTSIZE) {
+		e->env_kern_pgdir[PDX(i)] = kern_pgdir[PDX(i)];
+	}
 
 
 #ifdef ZERO_COPY
@@ -330,6 +369,8 @@ region_alloc(struct Env *e, void *va, size_t len)
 			panic("region_alloc: page_alloc failed");
 		if ((r = page_insert(e->env_pgdir, page, (void *)i, PTE_W | PTE_U)) < 0)
 			panic("region_alloc: %e", r);
+		if ((r = page_insert(e->env_kern_pgdir, page, (void *)i, PTE_W | PTE_U)) < 0) 
+			panic("region_alloc: %e", r);
 	}
 }
 
@@ -387,7 +428,7 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
-	lcr3(PADDR(e->env_pgdir));
+	lcr3(PADDR(e->env_kern_pgdir));	
 	struct Elf *elf = (struct Elf *)binary;
 
 	// is this a valid ELF?
@@ -488,10 +529,36 @@ env_free(struct Env *e)
 		e->env_pgdir[pdeno] = 0;
 		page_decref(pa2page(pa));
 	}
+	
+	for (pdeno = 0; pdeno < PDX(UTOP); pdeno++) {
+
+		// only look at mapped page tables
+		if (!(e->env_kern_pgdir[pdeno] & PTE_P))
+			continue;
+
+		// find the pa and va of the page table
+		pa = PTE_ADDR(e->env_kern_pgdir[pdeno]);
+		pt = (pte_t*) KADDR(pa);
+
+		// unmap all PTEs in this page table
+		for (pteno = 0; pteno <= PTX(~0); pteno++) {
+			if (pt[pteno] & PTE_P)
+				page_remove(e->env_kern_pgdir, PGADDR(pdeno, pteno, 0));
+		}
+
+		// free the page table itself
+		e->env_kern_pgdir[pdeno] = 0;
+		page_decref(pa2page(pa));
+	}
 
 	// free the page directory
 	pa = PADDR(e->env_pgdir);
 	e->env_pgdir = 0;
+	page_decref(pa2page(pa));
+
+	// free the kernel page directory
+	pa = PADDR(e->env_kern_pgdir);
+	e->env_kern_pgdir = 0;
 	page_decref(pa2page(pa));
 
 	// return the environment to the free list
@@ -584,6 +651,7 @@ check_isolate(struct Env *e)
 //
 // This function does not return.
 //
+__user_mapped_text
 void
 env_pop_tf(struct Trapframe *tf)
 {
@@ -619,7 +687,7 @@ void
 env_run(struct Env *e)
 {
 	// Verify no sensitive kernel page has PTE_P
-	check_isolate(e);
+	// check_isolate(e);
 
 	// Step 1: If this is a context switch (a new environment is running):
 	//	   1. Set the current environment (if any) back to
@@ -645,10 +713,9 @@ env_run(struct Env *e)
 		curenv = e;
 		e->env_status = ENV_RUNNING;
 		e->env_runs += 1;
-		lcr3(PADDR(e->env_pgdir));
 	}
 	unlock_kernel();
-	env_pop_tf(&e->env_tf);
+	kpti_run(e);
 
 	// panic("env_run not yet implemented");
 }
