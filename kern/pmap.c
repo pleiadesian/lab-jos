@@ -21,7 +21,6 @@ static size_t npages_basemem;	// Amount of base memory (in pages)
 pde_t *kern_pgdir;		// Kernel's initial page directory
 struct PageInfo *pages;		// Physical page state array
 static struct PageInfo *page_free_list;	// Free list of physical pages
-static int cnt = 0;
 
 
 // --------------------------------------------------------------
@@ -402,7 +401,6 @@ page_alloc(int alloc_flags)
 		memset(pa, '\0', PGSIZE);
 	}
 
-	cnt--;
 	return alloc_page;
 }
 
@@ -421,7 +419,6 @@ page_free(struct PageInfo *pp)
 
 	pp->pp_link = page_free_list;
 	page_free_list = pp;
-	cnt++;
 }
 
 //
@@ -764,10 +761,6 @@ user_mem_assert(struct Env *env, const void *va, size_t len, int perm)
 			"va %08x\n", env->env_id, user_mem_check_addr);
 		env_destroy(env);	// may not return
 	}
-}
-
-int count_free() {
-	return cnt;
 }
 
 // --------------------------------------------------------------

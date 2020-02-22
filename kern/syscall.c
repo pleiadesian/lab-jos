@@ -608,13 +608,6 @@ sys_net_recv(void *buf, uint32_t len)
 	return e1000_rx(buf, len);
 }
 
-int
-sys_net_tdt()
-{
-	int a = count_free();
-	return a;
-}
-
 #ifdef ZERO_COPY
 int
 sys_net_tdt()
@@ -719,10 +712,6 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		}
 		case SYS_net_recv: {
 			ret = sys_net_recv((void*)a1, a2);
-			break;
-		}
-		case SYS_net_tdt: {
-			ret = sys_net_tdt();
 			break;
 		}
 #ifdef ZERO_COPY

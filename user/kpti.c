@@ -75,45 +75,25 @@ static void
 check_memory_leak2()
 {
 	uintptr_t end;
-	cprintf("before fork %d\n", sys_net_tdt());
 	for (uintptr_t va = PTSIZE * 4; ; va += PGSIZE) {
 		if (sys_page_alloc(0, (void *) va, PTE_U | PTE_P) == -E_NO_MEM) {
 			end = va;
 			break;
 		}
 	}
-	cprintf("after alloc %d\n", sys_net_tdt());
 	assert(end - PTSIZE * 4 > PGSIZE * 20);
 	for (uintptr_t va = PTSIZE * 4; va < end; va += PGSIZE)
 		assert(sys_page_unmap(0, (void *) va) == 0);
-	cprintf("after unmap %d\n", sys_net_tdt());
-	for (uintptr_t va = PTSIZE * 4; va < end; va += PGSIZE)
-		assert(sys_page_alloc(0, (void *) va, PTE_U | PTE_P) == 0);
-	cprintf("after realloc %d\n", sys_net_tdt());
-	for (uintptr_t va = PTSIZE * 4; va < end; va += PGSIZE)
-		assert(sys_page_unmap(0, (void *) va) == 0);
-	end -= PGSIZE * 100;
+	end -= PGSIZE * 20;
 	for (int i = 0; i < 20; i++) {
-		cprintf("before fork %d\n", sys_net_tdt());
 		envid_t child;
 		child = fork();
-		cprintf("after fork %d %d\n", i, sys_net_tdt());
 		assert(child >= 0);
 		if (child == 0) {
-			cprintf("child %d\n", sys_net_tdt());
-			int cnt = 0;
-			for (uintptr_t va = PTSIZE * 4; va < end; va += PGSIZE) {
-				cnt++;
-				if (sys_net_tdt() < -31070 || sys_net_tdt() > -1475) {
-					cprintf("map %d\n", sys_net_tdt());
-					cprintf("cnt %d\n", cnt);
-				}
+			for (uintptr_t va = PTSIZE * 4; va < end; va += PGSIZE)
 				assert(sys_page_alloc(0, (void *) va, PTE_U | PTE_P) == 0);
-			}
-			cprintf("cnt %d\n", cnt);
 			exit();
 		}
-		cprintf("parent %d\n", sys_net_tdt());
 		wait(child);
 	}
 }
