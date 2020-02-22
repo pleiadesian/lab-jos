@@ -551,6 +551,15 @@ env_free(struct Env *e)
 		page_decref(pa2page(pa));
 	}
 
+	for (pdeno = PDX(KERNBASE); pdeno < PDX(~0); pdeno++) {
+		// only look at mapped page tables
+		if (!(e->env_pgdir[pdeno] & PTE_P))
+			continue;
+		pa = PTE_ADDR(e->env_pgdir[pdeno]);
+		e->env_pgdir[pdeno] = 0;
+		page_decref(pa2page(pa));
+	}
+
 	// free the page directory
 	pa = PADDR(e->env_pgdir);
 	e->env_pgdir = 0;

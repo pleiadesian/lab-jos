@@ -231,6 +231,13 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 		page_free(pp);
 		return r;
 	}
+
+	struct PageInfo *upp = page_lookup(env->env_pgdir, va, NULL);
+	struct PageInfo *kpp = page_lookup(env->env_kern_pgdir, va, NULL);
+	assert(upp != NULL);
+	assert(kpp != NULL);
+	assert(upp->pp_ref == 2 && kpp->pp_ref == 2);
+	assert(upp == kpp);
 		
 	return 0;
 }
@@ -322,8 +329,17 @@ sys_page_unmap(envid_t envid, void *va)
 	if ((uintptr_t)va >= UTOP || (uintptr_t)va % PGSIZE) 
 		return -E_INVAL;
 
+	struct PageInfo *pp = page_lookup(env->env_pgdir, va, NULL);
+	assert (pp == page_lookup(env->env_kern_pgdir, va, NULL));
+	bool ass = false;
+	if (pp && pp->pp_ref == 2) {
+		ass = true;
+	}
+	if (ass) assert(pp->pp_ref == 2);
 	page_remove(env->env_pgdir, va);
+	if (ass) assert(pp->pp_ref == 1);
 	page_remove(env->env_kern_pgdir, va);
+	if (ass) assert(pp->pp_ref == 0);
 	return 0;
 }
 
@@ -515,9 +531,14 @@ sys_map_kernel_page(void* kpage, void* va)
     struct PageInfo* p = pa2page(PADDR(kpage));
     if (p == NULL)
         return -E_INVAL;
-    r = page_insert(curenv->env_pgdir, p, va, PTE_U | PTE_W);
-	r = page_insert(curenv->env_kern_pgdir, p, va, PTE_U | PTE_W);
-    return r;
+    if ((r = page_insert(curenv->env_pgdir, p, va, PTE_U | PTE_W)) < 0) {
+		return r;
+	}
+	if ((r = page_insert(curenv->env_kern_pgdir, p, va, PTE_U | PTE_W)) < 0) {
+		page_remove(curenv->env_pgdir, va);
+		return r;
+	}
+    return 0;
 }
 
 static int
@@ -585,6 +606,13 @@ sys_net_recv(void *buf, uint32_t len)
 	if ((r = user_mem_check(curenv, buf, len, PTE_U | PTE_W)) < 0) 
 		return r;
 	return e1000_rx(buf, len);
+}
+
+int
+sys_net_tdt()
+{
+	int a = count_free();
+	return a;
 }
 
 #ifdef ZERO_COPY
@@ -691,6 +719,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		}
 		case SYS_net_recv: {
 			ret = sys_net_recv((void*)a1, a2);
+			break;
+		}
+		case SYS_net_tdt: {
+			ret = sys_net_tdt();
 			break;
 		}
 #ifdef ZERO_COPY

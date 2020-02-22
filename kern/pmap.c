@@ -21,6 +21,7 @@ static size_t npages_basemem;	// Amount of base memory (in pages)
 pde_t *kern_pgdir;		// Kernel's initial page directory
 struct PageInfo *pages;		// Physical page state array
 static struct PageInfo *page_free_list;	// Free list of physical pages
+static int cnt = 0;
 
 
 // --------------------------------------------------------------
@@ -400,6 +401,8 @@ page_alloc(int alloc_flags)
 		char *pa = (char *) page2kva(alloc_page);
 		memset(pa, '\0', PGSIZE);
 	}
+
+	cnt--;
 	return alloc_page;
 }
 
@@ -418,6 +421,7 @@ page_free(struct PageInfo *pp)
 
 	pp->pp_link = page_free_list;
 	page_free_list = pp;
+	cnt++;
 }
 
 //
@@ -577,6 +581,9 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 	// A page has already mapped at 'va', it should be removed
 	if (*pte & PTE_P) {
 		assert(!(*pte & PTE_PS));  // large page should not be evicted
+		// pte_t *pgtab_entry = &pgdir[PDX(va)];
+		// struct PageInfo *pp_pgtab = pa2page(PTE_ADDR(*pgtab_entry));
+		// pp_pgtab->pp_ref += 1;
 		page_remove(pgdir, va);
 		tlb_invalidate(pgdir, va);
 	}
@@ -634,6 +641,10 @@ page_remove(pde_t *pgdir, void *va)
 	// no physical page, do nothing
 	if (page == NULL) 
 		return;
+
+	// pte_t *pgtab_entry = &pgdir[PDX(va)];
+	// struct PageInfo *pp_pgtab = pa2page(PTE_ADDR(*pgtab_entry));
+	// page_decref(pp_pgtab);
 
 	assert(pte_store != NULL);
 	page_decref(page);
@@ -755,6 +766,9 @@ user_mem_assert(struct Env *env, const void *va, size_t len, int perm)
 	}
 }
 
+int count_free() {
+	return cnt;
+}
 
 // --------------------------------------------------------------
 // Checking functions.
